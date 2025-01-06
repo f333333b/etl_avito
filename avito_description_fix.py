@@ -1,35 +1,37 @@
 import re
-from bs4 import BeautifulSoup as bs
+from bs4 import BeautifulSoup
 import os
 import pandas as pd
 (pd.set_option('display.max_columns', 3))
 
+# функция для создания HTML-тега и добавления в BeautifulSoup
+def create_tag(soup, tag_name='', text='', is_html=None):
+    tag_to_add = soup.new_tag(tag_name)
+    if text:
+        if is_html:
+            tag_to_add = BeautifulSoup(text, 'html.parser')
+        else:
+            tag_to_add.string = text
+    soup.append(tag_to_add)
+
 # функция обработки строк таблицы
-def process_row(row, search_words, keywords, text_sample, end_text):
+def process_row(row, search_words, keywords, text_sample, end_text_part1, end_text_part2):
     title = row['Title']
     description = row['Description'].upper()
     vehicle_type = row['VehicleType']
     match_tech = re.search(search_words, description, re.IGNORECASE)  # поиск тех.характеристик
     tech_text = get_tech(match_tech, description)
-    soup = bs('', 'html.parser')
-    bold_tag = soup.new_tag('b')
-    bold_tag.string = title
-    soup.append(bold_tag)
-    br_tag = soup.new_tag('br')  # Создание тега <br />
-    soup.append(br_tag)
-    soup.append(bs(text_sample, 'html.parser'))
+    soup = BeautifulSoup('', 'html.parser')
+    create_tag(soup, 'b', title)
+    create_tag(soup, 'br')
+    create_tag(soup, text=text_sample, is_html=True)
     if tech_text:
-        p_tag = soup.new_tag('p')
-        strong_tag = soup.new_tag('strong')
-        strong_tag.string = "Характеристики:"
-        p_tag.append(strong_tag)
-        tech_text_soup = bs(tech_text, 'html.parser')
-        p_tag.append(tech_text_soup)
-        soup.append(p_tag)
-    soup.append(bs(end_text, 'html.parser'))
-    keywords_tag = soup.new_tag('p')
-    keywords_tag.string = keywords.get(vehicle_type, '')
-    soup.append(keywords_tag)
+        create_tag(soup, 'p')
+        create_tag(soup, 'strong', text='Характеристики:')
+        create_tag(soup, text=tech_text, is_html=True)
+    create_tag(soup, 'p', text=end_text_part1)
+    create_tag(soup, 'p', text=end_text_part2)
+    create_tag(soup, 'p', text=keywords.get(vehicle_type, ''))
     result = str(soup)
     result_list.append(result)
 
@@ -38,13 +40,15 @@ def get_tech(match, description):
     if match:
         tech_index = match.end()
         tech = description[tech_index:].strip(':\"')
+        # обрезка тех.характеристик до черты из знаков '='
         try:
-            equals_index = tech.index('==')  # обрезка тех.характеристик до черты из знаков '='
+            equals_index = tech.index('==')
             tech_result = tech[:equals_index].strip(':\"')
         except:
             tech_result = tech.strip(':')
         duplicates_removed_temp = 0
-        for value in keywords.values():  # удаление дублирующей строки с ключ-словами (если есть)
+        # удаление дублирующей строки с ключ-словами (если есть)
+        for value in keywords.values():
             if value.upper() in tech_result:
                 duplicates_removed_temp += 1
                 tech_result = tech_result.replace(value.upper(), '')
@@ -66,14 +70,15 @@ with open('avito_description_fix_sample_text.txt', 'r', encoding='utf-8') as fil
     text_sample = file_sample_text.read()
 
 # текст после технических характеристик
-end_text = '''<p>Не упустите возможность приобрести технику, которая станет вашим надежным помощником в любых условиях! Мы приглашаем посетить наш салон, где вы сможете ознакомиться с полным ассортиментом и получить профессиональную консультацию от наших специалистов.</p>
-<p>Готовы к новым приключениям? Свяжитесь с нами прямо сейчас и выберите свою идеальную мототехнику!</p>
-<p>&nbsp;</p>'''
+end_text_part1 = '''Не упустите возможность приобрести технику, которая станет вашим надежным помощником в любых условиях! Мы приглашаем посетить наш салон, где вы сможете ознакомиться с полным ассортиментом и получить профессиональную консультацию от наших специалистов'''
+end_text_part2 = '''Готовы к новым приключениям? Свяжитесь с нами прямо сейчас и выберите свою идеальную мототехнику!'''
 
 # регулярные выражения для поиска тех.характеристик
 search_words = r"ТЕХНИЧЕСКИЕ ХАРАКТЕРИСТИКИ|ТEXНИЧECКИE XAPAКТEPИCТИКИ|ХАРАКТЕРИСТИКИ"
 
 # основной код
+
+# ввод имени файла с таблицей, создание копии файла
 input_file = input("Введите имя файла с таблицей:")
 output_file = 'Copy of ' + input_file
 counter = 0
@@ -81,10 +86,11 @@ while os.path.isfile(output_file):
     counter += 1
     output_file = f"Copy of {os.path.splitext(input_file)[0]}_{counter}{os.path.splitext(input_file)[1]}"
 
-table = pd.read_excel(input_file, nrows=5)
+# чтение файла, обработка таблицы, запись результатов в DataFrame переменную
+table = pd.read_excel(input_file) # nrows=5
 table.to_excel(output_file, engine='openpyxl', index=False)
 result_list = []
-table.apply(process_row, axis=1, args=(search_words, keywords, text_sample, end_text))
+table.apply(process_row, axis=1, args=(search_words, keywords, text_sample, end_text_part1, end_text_part2))
 result_dict = {'Description': result_list}
 result_df = pd.DataFrame(result_dict)
 
