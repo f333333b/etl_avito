@@ -74,7 +74,7 @@ end_text = '''<p>Не упустите возможность приобрест
 search_words = r"ТЕХНИЧЕСКИЕ ХАРАКТЕРИСТИКИ|ТEXНИЧECКИE XAPAКТEPИCТИКИ|ХАРАКТЕРИСТИКИ"
 
 # основной код
-input_file = input()
+input_file = input("Введите имя файла с таблицей:")
 output_file = 'Copy of ' + input_file
 counter = 0
 while os.path.isfile(output_file):
