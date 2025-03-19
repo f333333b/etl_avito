@@ -58,7 +58,7 @@ def open_and_click(ids):
                 print(f"Не удалось нажать кнопку 'Опубликовать' на странице {url}")
     print(f'Всего успешно опубликовано {total} объявлений!')
 
-with open('to_activate.txt', 'r') as file:
+with open('input_05.03.2025.txt', 'r') as file:
     args = file.read()
 open_and_click(args)
 time.sleep(30)
