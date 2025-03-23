@@ -8,29 +8,31 @@ import time
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+def main():
+    load_dotenv()
+    TESSERACT_PATH = os.getenv('TESSERACT_PATH')
+    BANNER_URL = os.getenv('BANNER_URL')
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+    banner_url = BANNER_URL
+    df = pd.read_excel(r'table.xlsx')
 
-TESSERACT_PATH = os.getenv('TESSERACT_PATH')
-BANNER_URL = os.getenv('BANNER_URL')
+    #условия фильтрации таблицы
+    price = df['Price'] < 200000
+    type_cross_enduro = df['Type'].isin(['Кроссовый', 'Эндуро'])
+    title_cross = df['Title'].str.lower().str.contains('кроссовый')
 
-pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
-banner_url = BANNER_URL
-df = pd.read_excel(r'table.xlsx')
-price = df['Price'] < 200000
+    filtered_items = df[price & (type_cross_enduro | title_cross)]
+    id_and_photo = list(zip(filtered_items['ImageUrls'].str.split('|').apply(lambda x: x[2].strip()).tolist(), filtered_items['AvitoId'].tolist()))
+    id_total = len(id_and_photo)
 
-#условия фильтрации таблицы
-type_cross_enduro = df['Type'].isin(['Кроссовый', 'Эндуро'])
-title_cross = df['Title'].str.lower().str.contains('кроссовый')
+    print(f'Всего объявлений для обработки: {id_total}')
+    total_ids_processed = collect_ids(df, banner_url, id_and_photo)
+    print(f'Всего объявлений, в которых заменено третье фото: {total_ids_processed}')
+    df.to_excel(r'table_updated.xlsx', index=False)
 
-filtered_items = df[price & (type_cross_enduro | title_cross)]
-id_and_photo = list(zip(filtered_items['ImageUrls'].str.split('|').apply(lambda x: x[2].strip()).tolist(), filtered_items['AvitoId'].tolist()))
-id_total = len(id_and_photo)
-id_list = []
-
-print(f'Всего объявлений для обработки: {id_total}')
-
-def collect_ids():
+def collect_ids(df, banner_url, id_and_photo):
     '''Функция поиска ID объявлений, в которых нужно изменить баннер'''
+    total_ids_processed = 0
     for item in id_and_photo:
         try:
             pic = unquote(item[0])
@@ -44,32 +46,26 @@ def collect_ids():
             img = Image.open(BytesIO(response.content))
             text = pytesseract.image_to_string(img)
             if 'MX280' in text:
-                print("Картинка - баннер со сравнениями")
+                print("Картинка - баннер со сравнениями. Пропуск.")
             else:
-                print(f"Картинка - фото, ID объявления: {id}")
-                process_id(id)
+                total_ids_processed += process_id(df, banner_url, id)
+                print(f"Картинка - фото, ID объявления: {id}.")
         except requests.exceptions.RequestException as e:
             print(f"Ошибка запроса для {pic}: {e}")
         except Exception as e:
             print(f"Ошибка обработки {pic}: {e}")
         time.sleep(3)
-    return id_list
+    return total_ids_processed
 
-def process_id(id):
+def process_id(df, banner_url, id):
     '''Функция замены третьего фото в столбце ImageUrls'''
-    id_list.append(id)
     img_urls = df.loc[df['AvitoId'] == id, 'ImageUrls'].iloc[0].split('|')
     img_urls[2] = banner_url
     edited_img_urls = '|'.join(img_urls)
-    print(edited_img_urls)
+    #print(edited_img_urls)
     df.loc[df['AvitoId'] == id, 'ImageUrls'] = edited_img_urls
-    print()
     print(f'Для объявления с ID {id} третье фото успешно заменено на баннер')
-    print()
+    return 1
 
-# основной код
-id_list = collect_ids()
-
-for id in id_list:
-    process_id(id)
-df.to_excel(r'table_updated.xlsx', index=False)
+if __name__ == '__main__':
+    main()
