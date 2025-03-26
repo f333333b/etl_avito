@@ -5,9 +5,11 @@ from openpyxl import load_workbook
 
 
 old_file = pd.read_excel('file_with_short_videos.xlsx')
-new_file = pd.read_excel('file_new.xlsx')
+new_file = pd.read_excel(r'C:\Users\fgkh\Desktop\table.xlsx')
+if 'VideoFileURL' in new_file.columns:
+    del new_file['VideoFileURL']
 merged_file = new_file.merge(old_file[['AvitoId', 'VideoFileURL']], on='AvitoId', how='left')
-merged_file.to_excel('file_updated.xlsx', index=False)
+merged_file.to_excel(r'C:\Users\fgkh\Desktop\file_updated.xlsx', index=False)
 added_links_count = merged_file['VideoFileURL'].notna().sum()
 print(f"Добавлено ссылок на видео: {added_links_count}")
 
