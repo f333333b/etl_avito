@@ -36,7 +36,13 @@ def collect_ids(df, banner_url, id_and_photo):
     for item in id_and_photo:
         try:
             pic = unquote(item[0])
-            id = int(item[1])
+            print(item)
+            if len(item) > 1:
+                if not pd.isna(item[1]):
+                    id = int(item[1])
+                else:
+                    id = 0
+                    print(f'Нет ID объявления')
             print(f"Обработка: {repr(pic)}")
             response = requests.get(pic, timeout=10, allow_redirects=True)
             response.raise_for_status()
