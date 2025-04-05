@@ -14,7 +14,7 @@ def main():
     BANNER_URL = os.getenv('BANNER_URL')
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
     banner_url = BANNER_URL
-    df = pd.read_excel(r'table.xlsx')
+    df = pd.read_excel(r'C:/Users/user/Desktop/file_updated.xlsx')
 
     #условия фильтрации таблицы
     price = df['Price'] < 200000
@@ -26,13 +26,15 @@ def main():
     id_total = len(id_and_photo)
 
     print(f'Всего объявлений для обработки: {id_total}')
-    total_ids_processed = collect_ids(df, banner_url, id_and_photo)
-    print(f'Всего объявлений, в которых заменено третье фото: {total_ids_processed}')
-    df.to_excel(r'table_updated.xlsx', index=False)
+    ids_processed = collect_ids(df, banner_url, id_and_photo)
+    print(f'ID объявлений, в которых заменено третье фото: {ids_processed}')
+    print(f'Всего отредактировано {len(ids_processed)} объявлений')
+
+    df.to_excel(r'C:/Users/user/Desktop/file_updated(photo).xlsx', index=False)
 
 def collect_ids(df, banner_url, id_and_photo):
     '''Функция поиска ID объявлений, в которых нужно изменить баннер'''
-    total_ids_processed = 0
+    ids_processed = []
     for item in id_and_photo:
         try:
             pic = unquote(item[0])
@@ -43,7 +45,7 @@ def collect_ids(df, banner_url, id_and_photo):
                 else:
                     id = 0
                     print(f'Нет ID объявления')
-            print(f"Обработка: {repr(pic)}")
+            #print(f"Обработка: {repr(pic)}")
             response = requests.get(pic, timeout=10, allow_redirects=True)
             response.raise_for_status()
             if 'image' not in response.headers.get('Content-Type', ''):
@@ -54,14 +56,14 @@ def collect_ids(df, banner_url, id_and_photo):
             if 'MX280' in text:
                 print("Картинка - баннер со сравнениями. Пропуск.")
             else:
-                total_ids_processed += process_id(df, banner_url, id)
+                ids_processed.append(process_id(df, banner_url, id))
                 print(f"Картинка - фото, ID объявления: {id}.")
         except requests.exceptions.RequestException as e:
             print(f"Ошибка запроса для {pic}: {e}")
         except Exception as e:
             print(f"Ошибка обработки {pic}: {e}")
-        time.sleep(3)
-    return total_ids_processed
+        time.sleep(2)
+    return ids_processed
 
 def process_id(df, banner_url, id):
     '''Функция замены третьего фото в столбце ImageUrls'''
@@ -71,7 +73,7 @@ def process_id(df, banner_url, id):
     #print(edited_img_urls)
     df.loc[df['AvitoId'] == id, 'ImageUrls'] = edited_img_urls
     print(f'Для объявления с ID {id} третье фото успешно заменено на баннер')
-    return 1
+    return id
 
 if __name__ == '__main__':
     main()
