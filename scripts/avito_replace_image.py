@@ -1,3 +1,11 @@
+'''
+Скрипт для замены ссылки на фото в строках с объявлениями Excel-таблицы
+- открывает Excel-файл
+- находит нужные строки по определенным условиям
+- проверяет, является ли вторая ссылка на фото в столбце 'ImageUrls' баннером
+- заменяет фото техники на картинку с баннером
+'''
+
 import pandas as pd
 import requests
 from PIL import Image
@@ -8,8 +16,11 @@ import time
 from dotenv import load_dotenv
 import os
 import shutil
+import argparse
+from datetime import datetime
 
 def find_tesseract_path():
+    '''Функция нахождения пути к файлу tesseract.exe'''
     tesseract_path = shutil.which("tesseract")
     if tesseract_path:
         print(f"Tesseract найден по пути: {tesseract_path}")
@@ -17,14 +28,30 @@ def find_tesseract_path():
         print("Tesseract не найден в PATH")
     return tesseract_path
 
-
 def main():
     load_dotenv()
     tesseract_path = find_tesseract_path()
     BANNER_URL = os.getenv('BANNER_URL')
+    if not BANNER_URL:
+        print("BANNER_URL не задан в .env")
+        exit(1)
     pytesseract.pytesseract.tesseract_cmd = tesseract_path
     banner_url = BANNER_URL
-    df = pd.read_excel(r'C:/Users/user/Desktop/file_updated.xlsx')
+
+    # обработка аргументов
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', required=True)
+    args = parser.parse_args()
+
+    # формирование пути к файлу
+    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+    input_path = os.path.join(desktop_path, args.input)
+
+    # загрузка таблицы
+    df = pd.read_excel(input_path)
+
+    # текст, наличие которого проверяется в распознанном изображении
+    text_to_detect_in_banner = 'MX280'
 
     #условия фильтрации таблицы
     price = df['Price'] < 200000
@@ -36,13 +63,14 @@ def main():
     id_total = len(id_and_photo)
 
     print(f'Всего объявлений для обработки: {id_total}')
-    ids_processed = collect_ids(df, banner_url, id_and_photo)
+    ids_processed = collect_ids(df, banner_url, id_and_photo, text_to_detect_in_banner)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_file = os.path.join(desktop_path, f"file_updated_{timestamp}.xlsx")
+    df.to_excel(output_file, index=False)
     print(f'ID объявлений, в которых заменено третье фото: {ids_processed}')
     print(f'Всего отредактировано {len(ids_processed)} объявлений')
 
-    df.to_excel(r'C:/Users/user/Desktop/file_updated(photo).xlsx', index=False)
-
-def collect_ids(df, banner_url, id_and_photo):
+def collect_ids(df, banner_url, id_and_photo, text_to_detect_in_banner):
     '''Функция поиска ID объявлений, в которых нужно изменить баннер'''
     ids_processed = []
     for item in id_and_photo:
@@ -55,7 +83,6 @@ def collect_ids(df, banner_url, id_and_photo):
                 else:
                     id = 0
                     print(f'Нет ID объявления')
-            #print(f"Обработка: {repr(pic)}")
             response = requests.get(pic, timeout=10, allow_redirects=True)
             response.raise_for_status()
             if 'image' not in response.headers.get('Content-Type', ''):
@@ -63,7 +90,7 @@ def collect_ids(df, banner_url, id_and_photo):
                 continue
             img = Image.open(BytesIO(response.content))
             text = pytesseract.image_to_string(img)
-            if 'MX280' in text:
+            if text_to_detect_in_banner in text:
                 print("Картинка - баннер со сравнениями. Пропуск.")
             else:
                 ids_processed.append(process_id(df, banner_url, id))
