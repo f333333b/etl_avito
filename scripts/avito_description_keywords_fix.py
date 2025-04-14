@@ -1,7 +1,7 @@
 import pandas as pd
 
 def main():
-    table_path = r'table.xlsx'
+    table_path = r'../table.xlsx'
     df = pd.read_excel(table_path)
     total_processed = 0
     key_dict = {
