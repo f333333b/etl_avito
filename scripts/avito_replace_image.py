@@ -7,12 +7,22 @@ from urllib.parse import unquote
 import time
 from dotenv import load_dotenv
 import os
+import shutil
+
+def find_tesseract_path():
+    tesseract_path = shutil.which("tesseract")
+    if tesseract_path:
+        print(f"Tesseract найден по пути: {tesseract_path}")
+    else:
+        print("Tesseract не найден в PATH")
+    return tesseract_path
+
 
 def main():
     load_dotenv()
-    TESSERACT_PATH = os.getenv('TESSERACT_PATH')
+    tesseract_path = find_tesseract_path()
     BANNER_URL = os.getenv('BANNER_URL')
-    pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
     banner_url = BANNER_URL
     df = pd.read_excel(r'C:/Users/user/Desktop/file_updated.xlsx')
 

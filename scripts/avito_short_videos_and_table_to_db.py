@@ -24,7 +24,7 @@ def add_short_videos():
     print(f"Добавлено ссылок на видео: {added_links_count}")
 
     # прикрепление первой строки в таблице
-    wb = load_workbook("file_updated.xlsx")
+    wb = load_workbook("../file_updated.xlsx")
     ws = wb.active
     ws.freeze_panes = "A2"
     wb.save("file_updated.xlsx")
