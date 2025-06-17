@@ -1,14 +1,14 @@
 import logging
 from extract import read_excel_file
-from transform import clean_raw_data, normalize_group_by_latest, check_uniqueness, normalize_addresses, unmatched_addresses, remove_invalid_dealerships, fill_missing_cities
+from transform import clean_raw_data, normalize_group_by_latest, check_uniqueness, normalize_addresses, unmatched_addresses, remove_invalid_dealerships, fill_missing_cities, validate_types
 from load import save_to_excel
 from dealerships import dealerships
 
 def main():
     try:
         # EXTRACT
-        input_path = r""
-        output_path = r""
+        input_path = r"C:\Users\user\Desktop\sample.xlsx"
+        output_path = r"C:\Users\user\Desktop\sample_output.xlsx"
         df = read_excel_file(input_path)
 
         # проверка наличия соответствующих колонок
@@ -21,6 +21,9 @@ def main():
         # TRANSFORM
         # удаление мусорных/пустых строк
         df = clean_raw_data(df)
+
+        # валидация типов данных определенных столбцов
+        df = validate_types(df)
 
         # проверка на уникальность значений столбцов AvitoId и Id
         ok_avitoid = check_uniqueness(df, column='AvitoId', skip_empty=True)
@@ -44,6 +47,8 @@ def main():
 
         # обеспечение полного размещения техники по разрешённым адресам
         df = fill_missing_cities(df, dealerships)
+
+        #
 
         # LOAD
         save_to_excel(df, output_path)

@@ -25,6 +25,29 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_cleaned
 
+def validate_types(df: pd.DataFrame) -> pd.DataFrame:
+    """Функция валидации типов данных определенных столбцов"""
+    errors = []
+
+    numeric_columns = ['AvitoId', 'Price', 'EngineCapacity', 'EngineYear', 'Kilometrage',
+                       'NumberOfGears', 'PersonCapacity', 'Power', 'TrackWidth', 'Year']
+
+    for col in numeric_columns:
+        if col in df.columns:
+            original = df[col].copy()
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+            invalid_mask = original.notna() & df[col].isna()
+            for idx in df[invalid_mask].index:
+                avito_id = df.loc[idx, 'AvitoId'] if 'AvitoId' in df.columns else 'N/A'
+                errors.append(f"Invalid {col} value in row {idx} (AvitoId={avito_id})")
+
+    if errors:
+        logging.warning("Найдены ошибки типов:\n" + "\n".join(errors))
+    else:
+        logging.info("Ошибок типов не найдено.")
+
+    return df
+
 def check_uniqueness(df: pd.DataFrame, column: str, skip_empty: bool) -> bool:
     """
     Функция проверки уникальности строк по столбцу.
@@ -68,6 +91,7 @@ def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
         lambda group: normalize_group(group, cols_to_normalize)
     ).reset_index(drop=True)
     logging.info(f"Количество нормализованных строк по столбцу 'Title': {normalized_df.shape[0]}.")
+    normalized_df['AvitoDateEnd'] = normalized_df['AvitoDateEnd'].dt.tz_localize(None).dt.strftime("%Y-%m-%d")
     return normalized_df
 
 def normalize_addresses(raw_address: str, id: str) -> str:
@@ -97,9 +121,9 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
         return False
     result_df = df[df.apply(is_allowed, axis=1)]
     if invalid_ids:
-        logging.warning(f"Удалены строки с нарушением дилерства: {len(invalid_ids)} шт.")
+        logging.info(f"Удалены строки с нарушением дилерства: {len(invalid_ids)} шт.")
         invalid_list = [int(avito_id) for avito_id in invalid_ids]
-        logging.warning(f"Список AvitoId удаленных строк:\n{invalid_list}")
+        logging.info(f"Список AvitoId удаленных строк:\n{invalid_list}")
     else:
         logging.info("Нарушений дилерства не обнаружено.")
     return result_df
@@ -136,7 +160,7 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
                 new_row['Id'] = f"{datetime.now().strftime('%d%m%Y')}{id_counter:06d}"
                 id_counter += 1
                 new_rows.append(new_row)
-            logging.warning(f"Для товара '{title}' (бренд: {make}) из {source} добавлены строки в количестве {len(missing_cities)} шт.")
+            logging.info(f"{title}: добавлены строки в количестве {len(missing_cities)} шт.")
     if new_rows:
         df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
         logging.info(f"Всего добавлено строк: {len(new_rows)}")
