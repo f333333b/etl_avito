@@ -167,3 +167,15 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
     else:
         logging.info("Все товары размещены в нужных городах. Новые строки не добавлялись.")
     return df
+
+def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
+    """Функция нормализации колонок Condition, Year, Kilometrage, DisplayAreas - приведение к единым значениям"""
+    current_year = datetime.now().year
+    df.loc[df['Condition'] != 'Б/у', 'Condition'] = 'Б/у'
+    df.loc[df['Year'] != current_year, 'Year'] = current_year
+    df.loc[df['Kilometrage'] != 5, 'Kilometrage'] = 5
+    df.loc[df['DisplayAreas'] != '', 'DisplayAreas'] = ''
+    return df
+
+def validate_data_types(df: pd.DataFrame) -> pd.DataFrame:
+    """Функция валидации типов данных определенных колонок"""
