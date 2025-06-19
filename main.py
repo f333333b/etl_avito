@@ -1,80 +1,97 @@
-import os
 import logging
-from dotenv import load_dotenv
+import pandas as pd
+import yaml
+from typing import Dict, Callable
+from etl.extract import read_excel_file
+from etl.transform import (
+    clean_raw_data, normalize_group_by_latest, normalize_addresses_column, remove_invalid_dealerships,
+    fill_missing_cities, normalize_columns_to_constants, convert_data_types
+)
+from etl.validation import validate_data
+from etl.load import load, save_to_excel
+from etl.dealerships import dealerships
+from etl.config import load_config, REQUIRED_ENV_VARS, INPUT_PATH, OUTPUT_PATH
+from pathlib import Path
 
-from extract import read_excel_file
-from transform import (clean_raw_data, normalize_group_by_latest, check_uniqueness, normalize_addresses,
-                       unmatched_addresses, remove_invalid_dealerships, fill_missing_cities, validate_data_types,
-                       normalize_columns_to_constants, validate_urls, validate_required_fields)
-from load import save_to_excel
-from dealerships import dealerships
+logger = logging.getLogger(__name__)
+
+TRANSFORM_FUNCTIONS: Dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
+    'clean_raw_data': clean_raw_data,
+    'normalize_group_by_latest': normalize_group_by_latest,
+    'normalize_addresses_column': normalize_addresses_column,
+    'remove_invalid_dealerships': remove_invalid_dealerships,
+    'fill_missing_cities': lambda df: fill_missing_cities(df, dealerships),
+    'normalize_columns_to_constants': normalize_columns_to_constants,
+    'convert_data_types': convert_data_types
+}
+
+def load_pipeline_config(config_path: str = 'pipeline_config.yaml') -> Dict:
+    """Функция загрузки конфигурации пайплайна из YAML-файла"""
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError as e:
+        logger.error(f"Конфигурационный файл не найден: {config_path}")
+        raise
+    except yaml.YAMLError as e:
+        logger.error(f"Ошибка парсинга YAML: {e}")
+        raise
+
+def transform_pipeline(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
+    """Функция трансформации согласно конфигурации"""
+    transformations = config.get('transformations', [])
+    for transform_name in transformations:
+        if transform_name not in TRANSFORM_FUNCTIONS:
+            logger.error(f"Неизвестная трансформация: {transform_name}")
+            raise ValueError(f"Неизвестная трансформация: {transform_name}")
+        logger.info(f"Выполняется трансформация: {transform_name}")
+        df = TRANSFORM_FUNCTIONS[transform_name](df)
+    return df
+
+def run_etl():
+    """Функция запуска ETL-пайплайна"""
+    config = load_config(REQUIRED_ENV_VARS, INPUT_PATH, OUTPUT_PATH)
+    pipeline_config = load_pipeline_config()
+
+    try:
+        # чтение
+        df = read_excel_file(config('INPUT_PATH'))
+
+        # валидация
+        is_valid, errors = validate_data(df)
+        if not is_valid:
+            logger.error(f"Валидация не пройдена: {'; '.join(errors)}")
+            raise ValueError(f"Валидация не пройдена: {'; '.join(errors)}")
+        logger.info("Валидация пройдена успешно")
+
+        # трансформация
+        df = transform_pipeline(df, pipeline_config)
+
+        # загрузка
+        load(df, config['OUTPUT_PATH'], config['API_FLAG'])
+        save_to_excel(df, config['OUTPUT_PATH'])
+        logger.info(f"Файл сохранён: {config['OUTPUT_PATH']}")
+
+    except FileNotFoundError as e:
+        logger.error(f"Ошибка доступа к файлу: {e}")
+        raise
+    except ValueError as e:
+        logger.error(f"Ошибка валидации или трансформации: {e}")
+        raise
+    except Exception as e:
+        logger.exception(f"Непредвиденная ошибка: {e}")
+        raise
 
 def main():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     try:
-        # EXTRACT
-        input_path = r""
-        output_path = r""
-        df = read_excel_file(input_path)
-
-        # проверка наличия соответствующих колонок
-        required_columns = ['Title', 'AvitoId', 'Id', 'Make', 'Address']
-        missing = [col for col in required_columns if col not in df.columns]
-        if missing:
-            logging.error(f"В датафрейме отсутствуют обязательные столбцы: {', '.join(missing)}. Проверь исходный файл.")
-            return df
-
-        # TRANSFORM
-        # удаление мусорных/пустых строк
-        df = clean_raw_data(df)
-
-        # валидация типов данных определенных столбцов
-        df = validate_data_types(df)
-
-        # проверка на уникальность значений столбцов AvitoId и Id
-        ok_avitoid = check_uniqueness(df, column='AvitoId', skip_empty=True)
-        ok_id = check_uniqueness(df, column='Id', skip_empty=False)
-
-        if not ok_avitoid or not ok_id:
-            raise ValueError("Нарушена уникальность AvitoId или Id")
-
-        # нормализация строк по столбцу Title
-        df = normalize_group_by_latest(df)
-
-        # фильтрация и корректировка значений Address в соответствии со справочником городов
-        df['Address'] = df.apply(lambda row: normalize_addresses(row['Address'], row['AvitoId']), axis=1)
-        if unmatched_addresses:
-            logging.warning(f"Не удалось нормализовать адреса ({len(unmatched_addresses)} шт.):")
-            for avito_id, raw_address in unmatched_addresses:
-                logging.warning(f" - AvitoId: {avito_id}, Address: {raw_address}")
-
-        # удаление строк, нарушающих дилерство
-        df = remove_invalid_dealerships(df)
-
-        # обеспечение полного размещения техники по разрешённым адресам
-        df = fill_missing_cities(df, dealerships)
-
-        # нормализация колонок Year, Condition, Kilometrage, DisplayAreas
-        df = normalize_columns_to_constants(df)
-
-        # валидация колонок VideoURL, VideoFilesURL, проверка работоспособности URL
-        df = validate_urls(df)
-
-        # валидация заполнения обязательных колонок в зависимости от VehicleType и Type
-        validate_required_fields(df)
-
-        # LOAD
-
-        load_dotenv()
-        client_id = os.getenv('CLIENT_ID')
-        client_secret = os.getenv('CLIENT_SECRET')
-        user_id = os.getenv('USER_ID')
-
-        save_to_excel(df, output_path)
-        logging.info(f"Файл сохранён: {output_path}")
-
+        run_etl()
+    except (FileNotFoundError, ValueError) as e:
+        logger.critical(f"Критическая ошибка: {e}")
+        raise
     except Exception as e:
-        logging.exception(f"Ошибка: {e}")
+        logger.critical(f"Непредвиденная ошибка: {e}")
+        raise
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     main()
