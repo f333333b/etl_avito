@@ -65,31 +65,17 @@ pip install -r requirements.txt
 Решают задачи нормализации описаний, фильтрации, проверки и замены определенных изображений, работы с API Avito.
 
 # To do:
-1) проверка типов данных в определенных ячейках (числовые, строковые, дата)
-числовые:
-integer_columns = ["AvitoId", "Price", "EngineCapacity", "Kilometrage", "PersonCapacity", "SeatingCapacity", "Power",
-"MaxPower", "Stroke", "TrackWidth"
-]
-
-float_columns = ["Width"]
-строковые:
-string_columns = [
-    "Id", "AvitoStatus", "AvitoDateEnd", "ListingFee", "Category", "Title",
-    "Description", "Condition", "Price", "ImageUrls", "VideoUrl", "Address", "ManagerName",
-    "EMail", "ContactPhone", "ContactMethod", "Availability", "CompanyName", "Control",
-    "Cylinders", "CylindersPosition", "DisplayAreas", "DriveType",
-    "EngineCooling", "EngineIncluded", "EngineMake", "EngineType", "EngineWeight",
-    "EngineYear", "FloorType", "FuelFeed", "Length", "Make",
-    "Model", "MotoType", "NumberOfGears", "Owners", "ShaftLength", "StartingSystem", "TechnicalPassport",
-    "TrailerIncluded", "Transmission", "TransomHeight", "Type", "VehicleType",
-    "VIN", "Weight", "Width", "Year"
-]
-
++1) проверка типов данных в определенных ячейках (числовые, строковые, дата)
 +2) проверка года
 +3) проверка чтобы везде в `Condition` было "Б/у"
 +4) `Year` всегда был действующий год
-5) валидация VideoURL и VideoFilesURL на соответствие формату ссылки (URL) + проверка, существует ли файл по ссылке (хотя бы HEAD-запросом)
++5) валидация VideoURL и VideoFilesURL на соответствие формату ссылки (URL) + проверка, существует ли файл по ссылке (хотя бы HEAD-запросом)
 6) проверка на обязательно заполненные столбцы для определенных категорий товара (по правилам документации Авито)
+мопеды и скутеры:
+
+
+
+
 
 LOAD
 1) запуска автозагрузки файла через авито апи (по необходимости через параметр в CLI или флаг)
