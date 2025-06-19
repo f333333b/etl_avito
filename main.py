@@ -1,4 +1,7 @@
+import os
 import logging
+from dotenv import load_dotenv
+
 from extract import read_excel_file
 from transform import (clean_raw_data, normalize_group_by_latest, check_uniqueness, normalize_addresses,
                        unmatched_addresses, remove_invalid_dealerships, fill_missing_cities, validate_data_types,
@@ -60,6 +63,12 @@ def main():
         validate_required_fields(df)
 
         # LOAD
+
+        load_dotenv()
+        client_id = os.getenv('CLIENT_ID')
+        client_secret = os.getenv('CLIENT_SECRET')
+        user_id = os.getenv('USER_ID')
+
         save_to_excel(df, output_path)
         logging.info(f"Файл сохранён: {output_path}")
 
