@@ -1,16 +1,16 @@
 import logging
 from extract import read_excel_file
 from transform import (clean_raw_data, normalize_group_by_latest, check_uniqueness, normalize_addresses,
-                       unmatched_addresses, remove_invalid_dealerships, fill_missing_cities, validate_types,
-                       normalize_columns_to_constants)
+                       unmatched_addresses, remove_invalid_dealerships, fill_missing_cities, validate_data_types,
+                       normalize_columns_to_constants, validate_urls, validate_required_fields)
 from load import save_to_excel
 from dealerships import dealerships
 
 def main():
     try:
         # EXTRACT
-        input_path = r"C:\Users\504\Desktop\186615585_2025-05-12T13_41_03Z.xlsx"
-        output_path = r"C:\Users\504\Desktop\sample_output.xlsx"
+        input_path = r""
+        output_path = r""
         df = read_excel_file(input_path)
 
         # проверка наличия соответствующих колонок
@@ -25,7 +25,7 @@ def main():
         df = clean_raw_data(df)
 
         # валидация типов данных определенных столбцов
-        df = validate_types(df)
+        df = validate_data_types(df)
 
         # проверка на уникальность значений столбцов AvitoId и Id
         ok_avitoid = check_uniqueness(df, column='AvitoId', skip_empty=True)
@@ -52,6 +52,12 @@ def main():
 
         # нормализация колонок Year, Condition, Kilometrage, DisplayAreas
         df = normalize_columns_to_constants(df)
+
+        # валидация колонок VideoURL, VideoFilesURL, проверка работоспособности URL
+        df = validate_urls(df)
+
+        # валидация заполнения обязательных колонок в зависимости от VehicleType и Type
+        validate_required_fields(df)
 
         # LOAD
         save_to_excel(df, output_path)
