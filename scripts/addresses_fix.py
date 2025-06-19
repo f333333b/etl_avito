@@ -9,7 +9,7 @@ from datetime import datetime
 
 from freeze_1st_row import freeze_1st_row
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from config.addresses_map import address_map
+from etl.config import address_map
 
 load_dotenv()
 
