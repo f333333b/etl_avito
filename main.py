@@ -57,6 +57,7 @@ def run_etl():
 
         # валидация
         is_valid, errors = validate_data(df)
+        print(errors)
         if not is_valid:
             logger.error(f"Валидация не пройдена: {'; '.join(errors)}")
             raise ValueError("Валидация не пройдена")
