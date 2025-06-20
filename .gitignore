@@ -1,7 +1,3 @@
-# excel файлы
-*.xlsx
-*.xls
-
 # текстовые файлы
 *.txt
 !requirements.txt

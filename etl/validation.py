@@ -43,7 +43,7 @@ def validate_urls(df: pd.DataFrame) -> Tuple[bool, List[str]]:
                 continue
             for idx, url in df[col].astype(str).items():
                 if url.strip() == '' or url.lower() == 'nan':
-                    continue  # пустые значения пропускаем
+                    continue
                 if not url.startswith(('http://', 'https://')):
                     errors.append(f"Некорректный формат URL в колонке {col}, строка {idx}: {url}")
                     continue
@@ -66,8 +66,6 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     quadro_columns = moto_columns + ['PersonCapacity']
     boat_engines_columns = ['EngineType', 'Power']
     boats_columns = ['FloorType', 'Length', 'Width', 'SeatingCapacity', 'MaxPower', 'TrailerIncluded', 'EngineIncluded']
-
-    # Проверка наличия базовых колонок
     missing_columns = [col for col in base_columns if col not in df.columns]
     if missing_columns:
         errors.append(f"Отсутствуют обязательные колонки: {', '.join(missing_columns)}")
