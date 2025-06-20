@@ -2,10 +2,6 @@ import os
 import logging
 import pandas as pd
 
-import os
-import logging
-import pandas as pd
-
 def read_excel_file(path: str) -> pd.DataFrame:
     """Функция чтения Excel-файла"""
     if not os.path.isfile(path):
