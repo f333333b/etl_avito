@@ -4,17 +4,17 @@ import pandas as pd
 import requests
 import yadisk
 from datetime import datetime
+from typing import Dict
 
-from etl.config import YANDEX_TOKEN, EMAIL
-
-def load(df: pd.DataFrame, output_path: str, api_flag=False) -> None:
-    if api_flag:
-        autoload_api_main(df, output_path)
+def load(df: pd.DataFrame, config: Dict) -> None:
+    if bool(config['API_FLAG']):
+        autoload_api_main(df, config)
     else:
-        save_to_excel(df, output_path)
+        save_to_excel(df, config)
 
-def save_to_excel(df: pd.DataFrame, path: str) -> str:
+def save_to_excel(df: pd.DataFrame, config: Dict) -> str:
     df = df.copy()
+    path = config['OUTPUT_PATH']
     folder = os.path.dirname(path)
     if folder and not os.path.isdir(folder):
         logging.error(f"Папка не существует: {folder}")
@@ -25,20 +25,24 @@ def save_to_excel(df: pd.DataFrame, path: str) -> str:
     logging.info(f"Excel-файл сохранён: {path}")
     return path
 
-def autoload_api_main(df: pd.DataFrame, path: str) -> None:
-    token = get_token()
-    saved_file = save_to_excel(df, path)
-    public_url = yandex_upload(saved_file)
+def autoload_api_main(df: pd.DataFrame, config: Dict) -> None:
+    email = config['EMAIL']
+    yandex_token = config['YANDEX_TOKEN']
+    token = get_token(config)
+    saved_file = save_to_excel(df, config)
+    public_url = yandex_upload(saved_file, yandex_token)
     update_avito_autoload_profile(
     access_token=token,
     upload_url=public_url,
-    report_email=EMAIL,
+    report_email=email,
     schedule=None,
     agreement=True,
     autoload_enabled=False
     )
 
-def get_token(client_id, client_secret) -> str:
+def get_token(config: Dict) -> str:
+    client_id = config['CLIENT_ID']
+    client_secret = config['CLIENT_SECRET']
     url = "https://api.avito.ru/token/"
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     data = {
@@ -58,8 +62,8 @@ def get_token(client_id, client_secret) -> str:
         return ""
 
 
-def yandex_upload(saved_file: str) -> str:
-    y = yadisk.YaDisk(token=YANDEX_TOKEN)
+def yandex_upload(saved_file: str, yandex_token: str) -> str:
+    y = yadisk.YaDisk(token=yandex_token)
     today_str = datetime.now().strftime("%Y-%m-%d")
     remote_path = f"/autoupload/{today_str}.xlsx"
     y.upload(saved_file, remote_path, overwrite=True)

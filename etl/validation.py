@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 from typing import Tuple, List
 from contextlib import contextmanager
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +17,8 @@ def excel_writer(filename: str):
         logger.error(f"Ошибка при записи файла {filename}: {e}")
         raise
 
-
 def validate_uniqueness(df: pd.DataFrame) -> Tuple[bool, List[str]]:
-    """Функция валидации уникальности колонок 'AvitoId' и 'Id'"""
+    """Функция валидации уникальности колонок AvitoId и Id"""
     errors = []
     for column, skip_empty in [('AvitoId', True), ('Id', False)]:
         filled_ids = df[column].dropna() if skip_empty else df[column]
@@ -34,7 +32,6 @@ def validate_uniqueness(df: pd.DataFrame) -> Tuple[bool, List[str]]:
             logger.info(f"Проверка '{column}' на уникальность пройдена")
     return (len(errors) == 0, errors)
 
-
 def validate_urls(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """Функция валидации значений колонок VideoURL и VideoFilesURL"""
     errors = []
@@ -42,22 +39,23 @@ def validate_urls(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     with requests.Session() as session:
         for col in url_columns:
             if col not in df.columns:
-                errors.append(f"Колонка {col} отсутствует")
+                logger.warning(f"Колонка {col} отсутствует, проверка пропущена")
                 continue
-            for url in df[col].astype(str):
+            for idx, url in df[col].astype(str).items():
+                if url.strip() == '' or url.lower() == 'nan':
+                    continue  # пустые значения пропускаем
                 if not url.startswith(('http://', 'https://')):
-                    errors.append(f"Некорректный формат URL в колонке {col}: {url}")
+                    errors.append(f"Некорректный формат URL в колонке {col}, строка {idx}: {url}")
                     continue
                 try:
                     response = session.head(url, timeout=5, allow_redirects=True)
                     if response.status_code != 200:
-                        errors.append(f"URL {url} в колонке {col} вернул статус {response.status_code}")
+                        errors.append(f"URL {url} в колонке {col}, строка {idx} вернул статус {response.status_code}")
                 except requests.RequestException as e:
-                    errors.append(f"Ошибка при HEAD-запросе к {url} в колонке {col}: {e}")
+                    errors.append(f"Ошибка при HEAD-запросе к {url} в колонке {col}, строка {idx}: {e}")
     if not errors:
-        logger.info("Проверка URL пройдена")
+        logger.info("Проверка URL пройдена успешно")
     return (len(errors) == 0, errors)
-
 
 def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """Функция валидации заполнения обязательных колонок"""
@@ -111,9 +109,8 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
         logger.info("Проверка обязательных полей пройдена")
     return (len(errors) == 0, errors)
 
-
 def validate_data(df: pd.DataFrame) -> Tuple[bool, List[str]]:
-    """Общая функция валидации данных."""
+    """Общая функция валидации данных"""
     errors = []
     is_valid = True
 

@@ -23,6 +23,7 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     return df_cleaned
 
 def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
+    """Функция для нормализации строк, сгруппированных по Title"""
     exclude_cols = ['AvitoStatus', 'AvitoDateEnd', 'Address']
     cols_to_normalize = [col for col in df.columns if col not in exclude_cols]
     df['AvitoDateEnd'] = pd.to_datetime(df['AvitoDateEnd'], errors='coerce', utc=True)
@@ -42,10 +43,7 @@ def normalize_addresses(raw_address: str, id: str) -> str:
     return raw_address
 
 def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Функция удаления строк, нарушающих дилерство по брендам и городам.
-    Логирует AvitoId удалённых строк.
-    """
+    """Функция удаления строк, нарушающих дилерство по брендам и городам"""
     invalid_ids = []
     def is_allowed(row):
         brand = str(row['Make']).strip()
@@ -68,10 +66,7 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
-    """
-    Валидация по каждой паре Title + Make: размещён ли товар во всех нужных городах.
-    Если нет — добавляем недостающие строки.
-    """
+    """Функция валидации размещения по всем городам согласно Title и Make"""
     id_counter = 1
     new_rows = []
     for (title, make), group in df.groupby(['Title', 'Make']):
@@ -117,7 +112,7 @@ def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[df['DisplayAreas'] != '', 'DisplayAreas'] = ''
     return df
 
-def normalize_addresses_column(df):
+def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
     df['Address'] = df.apply(lambda row: normalize_addresses(row['Address'], row['AvitoId']), axis=1)
     return df
 

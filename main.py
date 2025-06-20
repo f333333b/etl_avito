@@ -8,10 +8,9 @@ from etl.transform import (
     fill_missing_cities, normalize_columns_to_constants, convert_data_types
 )
 from etl.validation import validate_data
-from etl.load import load, save_to_excel
 from etl.dealerships import dealerships
-from etl.config import load_config, REQUIRED_ENV_VARS, INPUT_PATH, OUTPUT_PATH
-from pathlib import Path
+from etl.config import load_config, REQUIRED_ENV_VARS, PATH_VARS
+from etl.load import load
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +30,10 @@ def load_pipeline_config(config_path: str = 'pipeline_config.yaml') -> Dict:
         with open(config_path, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
     except FileNotFoundError as e:
-        logger.error(f"Конфигурационный файл не найден: {config_path}")
+        logger.error(f"Конфигурационный YAML-файл не найден: {config_path}. Ошибка {e}")
         raise
     except yaml.YAMLError as e:
-        logger.error(f"Ошибка парсинга YAML: {e}")
+        logger.error(f"Ошибка парсинга YAML-файла: {e}")
         raise
 
 def transform_pipeline(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
@@ -44,33 +43,31 @@ def transform_pipeline(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
         if transform_name not in TRANSFORM_FUNCTIONS:
             logger.error(f"Неизвестная трансформация: {transform_name}")
             raise ValueError(f"Неизвестная трансформация: {transform_name}")
-        logger.info(f"Выполняется трансформация: {transform_name}")
+        logger.info(f"Выполняется {transform_name}: {TRANSFORM_FUNCTIONS[transform_name].__doc__}")
         df = TRANSFORM_FUNCTIONS[transform_name](df)
     return df
 
 def run_etl():
     """Функция запуска ETL-пайплайна"""
-    config = load_config(REQUIRED_ENV_VARS, INPUT_PATH, OUTPUT_PATH)
+    config = load_config(REQUIRED_ENV_VARS, PATH_VARS)
     pipeline_config = load_pipeline_config()
 
     try:
-        # чтение
-        df = read_excel_file(config('INPUT_PATH'))
+        df = read_excel_file(config['INPUT_PATH'])
 
         # валидация
         is_valid, errors = validate_data(df)
         if not is_valid:
             logger.error(f"Валидация не пройдена: {'; '.join(errors)}")
-            raise ValueError(f"Валидация не пройдена: {'; '.join(errors)}")
-        logger.info("Валидация пройдена успешно")
+            raise ValueError("Валидация не пройдена")
+        else:
+            logger.info("Валидация пройдена успешно")
 
         # трансформация
         df = transform_pipeline(df, pipeline_config)
 
         # загрузка
-        load(df, config['OUTPUT_PATH'], config['API_FLAG'])
-        save_to_excel(df, config['OUTPUT_PATH'])
-        logger.info(f"Файл сохранён: {config['OUTPUT_PATH']}")
+        load(df, config)
 
     except FileNotFoundError as e:
         logger.error(f"Ошибка доступа к файлу: {e}")
