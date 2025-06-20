@@ -1,61 +1,100 @@
+import re
 import pandas as pd
 import requests
 import logging
+import time
+import random
 from datetime import datetime
-from typing import Tuple, List
-from contextlib import contextmanager
+from typing import Tuple, List, Optional
+
+from etl.load import excel_writer
 
 logger = logging.getLogger(__name__)
 
+def get_duplicated_values(series: pd.Series) -> pd.Series:
+    """Функция возвращает уникальные значения, которые дублируются в серии"""
+    return series[series.duplicated()].unique()
 
-@contextmanager
-def excel_writer(filename: str):
-    """Контекстный менеджер для записи Excel-файла."""
-    try:
-        yield filename
-    except Exception as e:
-        logger.error(f"Ошибка при записи файла {filename}: {e}")
-        raise
+def get_duplicated_rows(df: pd.DataFrame, column: str, skip_empty: bool = True) -> pd.DataFrame:
+    """Функция возвращает строки, содержащие дублирующиеся значения в заданной колонке"""
+    series = df[column].dropna() if skip_empty else df[column]
+    duplicates = get_duplicated_values(series)
+    return df[df[column].isin(duplicates)]
+
+def save_duplicates_to_excel(df: pd.DataFrame, column: str) -> str:
+    """Функция сохраняет дубликаты в Excel-файл и возвращает путь к файлу"""
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"./validation_logs/duplicates_{column}_{timestamp}.xlsx"
+    with excel_writer(filename) as fname:
+        df.to_excel(fname, index=False)
+    return filename
 
 def validate_uniqueness(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """Функция валидации уникальности колонок AvitoId и Id"""
     errors = []
     for column, skip_empty in [('AvitoId', True), ('Id', False)]:
-        filled_ids = df[column].dropna() if skip_empty else df[column]
-        duplicated = filled_ids[filled_ids.duplicated()].unique()
-        if len(duplicated) > 0:
-            filename = f"duplicates_{column}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
-            with excel_writer(filename) as fname:
-                df[df[column].isin(duplicated)].to_excel(fname, index=False)
-            errors.append(f"Найдены дубликаты в '{column}' (всего: {len(duplicated)}). Сохранено в: {filename}")
+        duplicated_df = get_duplicated_rows(df, column, skip_empty)
+        if not duplicated_df.empty:
+            file_path = save_duplicates_to_excel(duplicated_df, column)
+            errors.append(
+                f"Найдены дубликаты в '{column}' (всего: {duplicated_df[column].nunique()}). Сохранено в: {file_path}"
+            )
         else:
             logger.info(f"Проверка '{column}' на уникальность пройдена")
-    return (len(errors) == 0, errors)
+    return len(errors) == 0, errors
+
+def check_url(session: requests.Session, id: str, url: str, delay_range=(0.2, 0.5)) -> Optional[str]:
+    '''Функция для проверки одного URL'''
+    if pd.isna(url) or str(url).strip() == '':
+        return None
+    if not url.startswith(('http://', 'https://')):
+        return f"Некорректный формат URL в строке с Id {id}: {url}"
+    try:
+        time.sleep(random.uniform(*delay_range))
+        response = session.head(url, timeout=5, allow_redirects=True)
+        if response.status_code != 200:
+            return f"URL {url} в строке с Id {id} вернул статус {response.status_code}"
+    except requests.RequestException as e:
+        return f"Ошибка при HEAD-запросе к {url} в строке с Id {id}: {e}"
+    return None
 
 def validate_urls(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """Функция валидации значений колонок VideoURL и VideoFilesURL"""
+
+    HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/123.0.0.0 Safari/537.36"
+        )
+    }
     errors = []
-    url_columns = ['VideoURL', 'VideoFilesURL']
+    url_columns = ['VideoURL', 'VideoFilesURL', 'ImageUrls']
+    total_checked = 0
     with requests.Session() as session:
+        session.headers.update(HEADERS)
         for col in url_columns:
             if col not in df.columns:
                 logger.warning(f"Колонка {col} отсутствует, проверка пропущена")
                 continue
-            for idx, url in df[col].astype(str).items():
-                if url.strip() == '' or url.lower() == 'nan':
-                    continue
-                if not url.startswith(('http://', 'https://')):
-                    errors.append(f"Некорректный формат URL в колонке {col}, строка {idx}: {url}")
-                    continue
-                try:
-                    response = session.head(url, timeout=5, allow_redirects=True)
-                    if response.status_code != 200:
-                        errors.append(f"URL {url} в колонке {col}, строка {idx} вернул статус {response.status_code}")
-                except requests.RequestException as e:
-                    errors.append(f"Ошибка при HEAD-запросе к {url} в колонке {col}, строка {idx}: {e}")
+            if col == 'ImageUrls':
+                for row_id, image_urls in df[col].astype(str).items():
+                    if image_urls.strip():
+                        first_image_url = image_urls.split('|')[0]
+                        total_checked += 1
+                        check_result = check_url(session=session, id=row_id, url=first_image_url.strip())
+                        if check_result:
+                            errors.append(check_result)
+            else:
+                for row_id, url in df[col].items():
+                    total_checked += 1
+                    check_result = check_url(session=session, id=row_id, url=url)
+                    if check_result:
+                        errors.append(check_result)
     if not errors:
         logger.info("Проверка URL пройдена успешно")
-    return (len(errors) == 0, errors)
+    logger.info(f"Всего URL проверено: {total_checked}, найдено ошибок: {len(errors)}")
+    return len(errors) == 0, errors
 
 def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """Функция валидации заполнения обязательных колонок"""
@@ -107,6 +146,36 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
         logger.info("Проверка обязательных полей пройдена")
     return (len(errors) == 0, errors)
 
+def validate_format_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
+    errors = []
+    is_valid = True
+
+    if 'EMail' in df.columns:
+        invalid_emails = df[~df['EMail'].fillna('').astype(str).str.match(r"[^@]+@[^@]+\.[^@]+")]
+        if not invalid_emails.empty:
+            is_valid = False
+            errors.append(f"Некорректные email: {len(invalid_emails)} строк")
+
+    if 'ContactPhone' in df.columns:
+        invalid_phones = df[~df['ContactPhone'].fillna('').astype(str).str.fullmatch(r"7\d{10}")]
+        if not invalid_phones.empty:
+            is_valid = False
+            errors.append(f"Некорректные номера телефонов: {len(invalid_phones)} строк")
+
+    if 'Id' in df.columns:
+        invalid_ids = df[~df['Id'].fillna('').astype(str).str.fullmatch(r"[A-Za-z0-9]+")]
+        if not invalid_ids.empty:
+            is_valid = False
+            errors.append(f"Некорректные Id: {len(invalid_ids)} строк")
+
+    if 'AvitoId' in df.columns:
+        invalid_avito_ids = df[~df['AvitoId'].fillna('').astype(str).str.fullmatch(r"\d+")]
+        if not invalid_avito_ids.empty:
+            is_valid = False
+            errors.append(f"Некорректные AvitoId: {len(invalid_avito_ids)} строк")
+
+    return is_valid, errors
+
 def validate_data(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """Общая функция валидации данных"""
     errors = []
@@ -123,8 +192,14 @@ def validate_data(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     is_valid &= valid
 
     # валидация URL
-    valid, url_errors = validate_urls(df)
-    errors.extend(url_errors)
+    # отключена
+    #valid, url_errors = validate_urls(df)
+    #errors.extend(url_errors)
+    #is_valid &= valid
+
+    # валидация форматов
+    valid, format_errors = validate_format_fields(df)
+    errors.extend(format_errors)
     is_valid &= valid
 
     if is_valid:

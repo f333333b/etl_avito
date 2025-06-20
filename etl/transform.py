@@ -23,16 +23,19 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     return df_cleaned
 
 def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
-    """Функция для нормализации строк, сгруппированных по Title"""
+    """Функция для нормализации строк, сгруппированных по Title — оставляет запись с самой поздней датой AvitoDateEnd"""
     exclude_cols = ['AvitoStatus', 'AvitoDateEnd', 'Address']
-    cols_to_normalize = [col for col in df.columns if col not in exclude_cols]
     df['AvitoDateEnd'] = pd.to_datetime(df['AvitoDateEnd'], errors='coerce', utc=True)
-    normalized_df = df.groupby('Title', group_keys=False).apply(
-        lambda group: normalize_group(group, cols_to_normalize)
-    ).reset_index(drop=True)
+    normalized_df = (
+        df.sort_values('AvitoDateEnd', ascending=False)
+          .groupby('Title', group_keys=False, sort=False)
+          .head(1)
+          .reset_index(drop=True)
+    )
     logging.info(f"Количество нормализованных строк по колонке 'Title': {normalized_df.shape[0]}.")
     normalized_df['AvitoDateEnd'] = normalized_df['AvitoDateEnd'].dt.tz_localize(None).dt.strftime("%Y-%m-%d")
     return normalized_df
+
 
 def normalize_addresses(raw_address: str, id: str) -> str:
     """Функция для нормализации написания адресов в колонке Address"""

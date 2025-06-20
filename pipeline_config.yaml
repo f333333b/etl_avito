@@ -1,0 +1,8 @@
+transformations:
+  - clean_raw_data
+  - normalize_group_by_latest
+  - normalize_addresses_column
+  - remove_invalid_dealerships
+  - fill_missing_cities
+  - normalize_columns_to_constants
+  - convert_data_types
