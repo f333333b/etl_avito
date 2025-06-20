@@ -32,6 +32,3 @@ ENV/
 build/
 dist/
 *.egg-info/
-
-# файлы скриптов
-/config/addresses_map.py
