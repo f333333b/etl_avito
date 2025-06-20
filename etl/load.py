@@ -6,23 +6,40 @@ import yadisk
 from datetime import datetime
 from typing import Dict
 
+from contextlib import contextmanager
+
+logger = logging.getLogger(__name__)
+
+@contextmanager
+def excel_writer(filename: str):
+    """Функция - контекстный менеджер для записи Excel-файла"""
+    try:
+        yield filename
+    except Exception as e:
+        logger.error(f"Ошибка при записи файла {filename}: {e}")
+        raise
+
 def load(df: pd.DataFrame, config: Dict) -> None:
-    if bool(config['API_FLAG']):
+    api_flag = str(config['API_FLAG']).lower() == "true"
+    if api_flag:
         autoload_api_main(df, config)
     else:
         save_to_excel(df, config)
+
 
 def save_to_excel(df: pd.DataFrame, config: Dict) -> str:
     df = df.copy()
     path = config['OUTPUT_PATH']
     folder = os.path.dirname(path)
+
     if folder and not os.path.isdir(folder):
         logging.error(f"Папка не существует: {folder}")
         raise FileNotFoundError(f"Папка не существует: {folder}")
     for col in df.select_dtypes(include=["datetimetz"]).columns:
         df[col] = df[col].dt.tz_localize(None)
-    df.to_excel(path, index=False)
-    logging.info(f"Excel-файл сохранён: {path}")
+    with excel_writer(path) as fname:
+        df.to_excel(fname, index=False)
+        logging.info(f"Excel-файл сохранён: {fname}")
     return path
 
 def autoload_api_main(df: pd.DataFrame, config: Dict) -> None:
