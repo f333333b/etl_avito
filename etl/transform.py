@@ -23,18 +23,22 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     return df_cleaned
 
 def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
-    """Функция для нормализации строк, сгруппированных по Title — оставляет запись с самой поздней датой AvitoDateEnd"""
-    exclude_cols = ['AvitoStatus', 'AvitoDateEnd', 'Address']
-    df['AvitoDateEnd'] = pd.to_datetime(df['AvitoDateEnd'], errors='coerce', utc=True)
-    normalized_df = (
-        df.sort_values('AvitoDateEnd', ascending=False)
-          .groupby('Title', group_keys=False, sort=False)
-          .head(1)
-          .reset_index(drop=True)
+    """Функция для нормализации строк, сгруппированных по Title"""
+
+    df['AvitoDateEnd'] = pd.to_datetime(df['AvitoDateEnd'], errors='coerce')
+    df['StatusPriority'] = df['AvitoStatus'].apply(lambda x: 1 if x == 'Активно' else 0)
+
+    df_sorted = (
+        df.sort_values(['Title', 'AvitoDateEnd', 'StatusPriority'], ascending=[True, False, False])
+        .drop_duplicates(subset='Title', keep='first')
+        .reset_index(drop=True)
     )
-    logging.info(f"Количество нормализованных строк по колонке 'Title': {normalized_df.shape[0]}.")
-    normalized_df['AvitoDateEnd'] = normalized_df['AvitoDateEnd'].dt.tz_localize(None).dt.strftime("%Y-%m-%d")
-    return normalized_df
+
+    df_sorted['AvitoDateEnd'] = df_sorted['AvitoDateEnd'].dt.strftime('%Y-%m-%d')
+    df_sorted = df_sorted.drop(columns='StatusPriority')
+
+    logging.info(f"Количество нормализованных строк по колонке 'Title': {df_sorted.shape[0]}.")
+    return df_sorted
 
 
 def normalize_addresses(raw_address: str, id: str) -> str:
