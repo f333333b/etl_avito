@@ -26,8 +26,11 @@
 ```bash
 etl_avito/
 │
-├── main.py                  # точка входа проекта
+├── data/                    # папка
 ├── extract.py               # extract
+├── extract.py               # extract
+├── extract.py               # extract
+
 ├── transform.py             # очистка, нормализация, валидация, фильтрация
 ├── load.py                  # сохранение результатов
 ├── dealerships.py           # справочник городов и брендов

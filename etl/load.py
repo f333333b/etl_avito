@@ -96,15 +96,7 @@ def update_avito_autoload_profile(
     agreement: bool = True,
     autoload_enabled: bool = True
 ):
-    """
-    Функция обновления профиля автозагрузки в Авито.
-    access_token: OAuth2 токен с правами на autoload
-    upload_url: Прямая ссылка на фид-файл (XML/CSV)
-    report_email: Почта для получения отчётов
-    schedule: Список расписаний, например: [{"start_hour": 9, "end_hour": 10, "limit": 1000}]
-    agreement: Согласие с правилами (обязательно при первом создании)
-    autoload_enabled: Вкл/выкл автозагрузку
-    """
+    """Функция обновления профиля автозагрузки в Авито"""
     if schedule is None:
         schedule = [
             {

@@ -144,7 +144,7 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
 
     if not errors:
         logger.info("Проверка обязательных полей пройдена")
-    return (len(errors) == 0, errors)
+    return len(errors) == 0, errors
 
 def validate_format_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     errors = []
@@ -192,7 +192,7 @@ def validate_data(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     is_valid &= valid
 
     # валидация URL
-    # отключена
+    # отключена потому что нужно проработать, как обойти ограничение авито на частые запросы (to do)
     #valid, url_errors = validate_urls(df)
     #errors.extend(url_errors)
     #is_valid &= valid
@@ -207,4 +207,4 @@ def validate_data(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     else:
         logger.error(f"Валидация не пройдена: {'; '.join(errors)}")
 
-    return (is_valid, errors)
+    return is_valid, errors
