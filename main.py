@@ -8,7 +8,7 @@ from etl.transform import (
     fill_missing_cities, normalize_columns_to_constants, convert_data_types
 )
 from etl.validation import validate_data
-from etl.dealerships import dealerships
+from data.reference_data import dealerships
 from etl.config import load_config, REQUIRED_ENV_VARS, PATH_VARS
 from etl.load import load
 

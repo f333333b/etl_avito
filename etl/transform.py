@@ -2,7 +2,7 @@ import re
 import pandas as pd
 import logging
 from datetime import datetime
-from etl.dealerships import cities, dealerships, city_to_full_address
+from data.reference_data import cities, dealerships, city_to_full_address
 
 def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     """Функция для удаления мусорных/пустых строк"""
