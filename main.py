@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
-    format='%(asctime)s | %(levelname)-5s| %(name)-15s| %(lineno)-4d %(funcName)-28s| %(message)s'
+    format='%(asctime)s | %(levelname)-5s| %(name)-15s| %(lineno)-4d| %(funcName)-28s| %(message)s'
 )
 
 
