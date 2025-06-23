@@ -18,7 +18,7 @@ def get_duplicated_values(series: pd.Series) -> pd.Series:
     return series[series.duplicated()].unique()
 
 def get_duplicated_rows(df: pd.DataFrame, column: str, skip_empty: bool = True) -> pd.DataFrame:
-    """Функция возвращает строки, содержащие дублирующиеся значения в заданной колонке"""
+    """Вспомогательная функция, которая возвращает строки, содержащие дублирующиеся значения в заданной колонке"""
     series = df[column].dropna() if skip_empty else df[column]
     duplicates = get_duplicated_values(series)
     return df[df[column].isin(duplicates)]
