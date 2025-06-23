@@ -1,18 +1,20 @@
 import re
+import os
 import pandas as pd
 import requests
 import logging
 import time
 import random
 from datetime import datetime
-from typing import Tuple, List, Optional
+from typing import List, Optional
 
 from etl.load import excel_writer
+from utils import ensure_dir_created
 
 logger = logging.getLogger(__name__)
 
 def get_duplicated_values(series: pd.Series) -> pd.Series:
-    """Функция возвращает уникальные значения, которые дублируются в серии"""
+    """Вспомогательная функция, которая возвращает уникальные значения, дублирующиеся в серии"""
     return series[series.duplicated()].unique()
 
 def get_duplicated_rows(df: pd.DataFrame, column: str, skip_empty: bool = True) -> pd.DataFrame:
@@ -23,13 +25,17 @@ def get_duplicated_rows(df: pd.DataFrame, column: str, skip_empty: bool = True) 
 
 def save_duplicates_to_excel(df: pd.DataFrame, column: str) -> str:
     """Функция сохраняет дубликаты в Excel-файл и возвращает путь к файлу"""
+
     timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    filename = f"./validation_logs/duplicates_{column}_{timestamp}.xlsx"
+    folder = "./validation_logs"
+    ensure_dir_created(folder)
+    filename = f"{folder}/duplicates_{column}_{timestamp}.xlsx"
     with excel_writer(filename) as fname:
         df.to_excel(fname, index=False)
+    logger.info(f"Дубликаты сохранены в файл: {filename}")
     return filename
 
-def validate_uniqueness(df: pd.DataFrame) -> Tuple[bool, List[str]]:
+def validate_uniqueness(df: pd.DataFrame) -> tuple[bool, List[str]]:
     """Функция валидации уникальности колонок AvitoId и Id"""
     errors = []
     for column, skip_empty in [('AvitoId', True), ('Id', False)]:
@@ -40,11 +46,12 @@ def validate_uniqueness(df: pd.DataFrame) -> Tuple[bool, List[str]]:
                 f"Найдены дубликаты в '{column}' (всего: {duplicated_df[column].nunique()}). Сохранено в: {file_path}"
             )
         else:
-            logger.info(f"Проверка '{column}' на уникальность пройдена")
+            pass
+            #logger.info(f"Проверка '{column}' на уникальность пройдена")
     return len(errors) == 0, errors
 
 def check_url(session: requests.Session, id: str, url: str, delay_range=(0.2, 0.5)) -> Optional[str]:
-    '''Функция для проверки одного URL'''
+    """Вспомогательная функция для проверки одного URL"""
     if pd.isna(url) or str(url).strip() == '':
         return None
     if not url.startswith(('http://', 'https://')):
@@ -58,7 +65,7 @@ def check_url(session: requests.Session, id: str, url: str, delay_range=(0.2, 0.
         return f"Ошибка при HEAD-запросе к {url} в строке с Id {id}: {e}"
     return None
 
-def validate_urls(df: pd.DataFrame) -> Tuple[bool, List[str]]:
+def validate_urls(df: pd.DataFrame) -> tuple[bool, List[str]]:
     """Функция валидации значений колонок VideoURL и VideoFilesURL"""
 
     HEADERS = {
@@ -96,7 +103,8 @@ def validate_urls(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     logger.info(f"Всего URL проверено: {total_checked}, найдено ошибок: {len(errors)}")
     return len(errors) == 0, errors
 
-def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
+# ПОЛНОСТЬЮ ПЕРЕРАБОТАТЬ (через справочник)
+def validate_required_fields(df: pd.DataFrame) -> tuple[bool, List[str]]:
     """Функция валидации заполнения обязательных колонок"""
     errors = []
     base_columns = ['Id', 'Address', 'Category', 'Title', 'Description', 'VehicleType', 'Make', 'Model',
@@ -142,11 +150,12 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     row_errors = df.apply(check_row, axis=1).dropna().tolist()
     errors.extend(row_errors)
 
-    if not errors:
-        logger.info("Проверка обязательных полей пройдена")
+    #if not errors:
+    #    logger.info("Проверка обязательных полей пройдена")
     return len(errors) == 0, errors
 
-def validate_format_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
+def validate_format_fields(df: pd.DataFrame) -> tuple[bool, List[str]]:
+    """Функция валидации формата данных в соответствии с требованиями каждой колонки"""
     errors = []
     is_valid = True
 
@@ -176,7 +185,7 @@ def validate_format_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
 
     return is_valid, errors
 
-def validate_data(df: pd.DataFrame) -> Tuple[bool, List[str]]:
+def validate_data(df: pd.DataFrame) -> tuple[bool, List[str]]:
     """Общая функция валидации данных"""
     errors = []
     is_valid = True

@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import logging
 from typing import Dict
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 REQUIRED_ENV_VARS = ['CLIENT_ID', 'CLIENT_SECRET', 'YANDEX_TOKEN', 'EMAIL', 'USER_ID', 'API_FLAG']
@@ -16,19 +15,9 @@ def load_config(required_vars: list[str], path_vars: list[str]) -> Dict[str, any
     config = {}
     missing_vars = []
 
-    for var in required_vars:
+    for var in required_vars + path_vars:
         value = os.getenv(var)
-        if not value:
-            missing_vars.append(var)
-        else:
-            config[var] = value
-
-    for path_var in path_vars:
-        path_value = os.getenv(path_var)
-        if not path_value:
-            missing_vars.append(path_var)
-        else:
-            config[path_var] = path_value
+        (missing_vars if not value else config)[var] = value
 
     if missing_vars:
         error_msg = f"Отсутствуют обязательные переменные окружения: {', '.join(missing_vars)}"
