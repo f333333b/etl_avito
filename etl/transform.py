@@ -2,7 +2,10 @@ import re
 import pandas as pd
 import logging
 from datetime import datetime
+from typing import Optional
 from data.reference_data import cities, dealerships, city_to_full_address
+
+logger = logging.getLogger(__name__)
 
 def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     """Функция для удаления мусорных/пустых строк"""
@@ -18,39 +21,43 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
 
     # подсчет количества удаленных строк
     removed = len(df) - len(df_cleaned)
-    logging.info(f'Удалено мусорных/пустых строк: {removed}')
+    logger.info(f'Удалено мусорных/пустых строк: {removed}')
 
     return df_cleaned
 
 def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
     """Функция для нормализации строк, сгруппированных по Title"""
 
+    #logger.info(f"Перед нормализацией по Title: {df.shape[0]} строк")
+
     df['AvitoDateEnd'] = pd.to_datetime(df['AvitoDateEnd'], errors='coerce')
     df['StatusPriority'] = df['AvitoStatus'].apply(lambda x: 1 if x == 'Активно' else 0)
 
     df_sorted = (
         df.sort_values(['Title', 'AvitoDateEnd', 'StatusPriority'], ascending=[True, False, False])
-        .drop_duplicates(subset='Title', keep='first')
+        .drop_duplicates(subset=['Title', 'Address'], keep='first')
         .reset_index(drop=True)
     )
 
     df_sorted['AvitoDateEnd'] = df_sorted['AvitoDateEnd'].dt.strftime('%Y-%m-%d')
     df_sorted = df_sorted.drop(columns='StatusPriority')
 
-    logging.info(f"Количество нормализованных строк по колонке 'Title': {df_sorted.shape[0]}.")
+    #logger.info(f"Количество нормализованных строк по колонке 'Title': {df_sorted.shape[0]}.")
+    #logger.info(f"После нормализации по Title: {df_sorted.shape[0]} строк")
+
     return df_sorted
 
+def normalize_addresses(raw_address: str, id: str) -> Optional[str]:
+    """Вспомогательная функция для нормализации написания адресов в колонке Address"""
 
-def normalize_addresses(raw_address: str, id: str) -> str:
-    """Функция для нормализации написания адресов в колонке Address"""
     for city, full_address in city_to_full_address.items():
         if re.search(fr"\b{re.escape(city)}\b", raw_address, re.IGNORECASE):
-            return full_address
-    logging.warning(f"Ненормализованный адрес (AvitoId: {id}): {raw_address}")
-    return raw_address
+            return True, full_address
+    return False, f"AvitoId: {id}, адрес: {raw_address}"
 
 def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
     """Функция удаления строк, нарушающих дилерство по брендам и городам"""
+
     invalid_ids = []
     def is_allowed(row):
         brand = str(row['Make']).strip()
@@ -65,20 +72,21 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
         return False
     result_df = df[df.apply(is_allowed, axis=1)]
     if invalid_ids:
-        logging.info(f"Удалены строки с нарушением дилерства: {len(invalid_ids)} шт.")
+        logger.info(f"Удалены строки с нарушением дилерства: {len(invalid_ids)} шт.")
         invalid_list = [int(avito_id) for avito_id in invalid_ids]
-        logging.info(f"Список AvitoId удаленных строк:\n{invalid_list}")
+        logger.info(f"Список AvitoId удаленных строк:")
+        logger.info(invalid_list)
     else:
-        logging.info("Нарушений дилерства не обнаружено.")
+        logger.info("Нарушений дилерства не обнаружено")
     return result_df
 
 def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
     """Функция валидации размещения по всем городам согласно Title и Make"""
+
     id_counter = 1
     new_rows = []
     for (title, make), group in df.groupby(['Title', 'Make']):
         allowed_cities = dealerships.get(make, cities)
-        source = "списка дилерства" if make in dealerships else "общего списка городов"
         existing_cities = set()
         for _, row in group.iterrows():
             if str(row['AvitoStatus']).strip().lower() != 'активно':
@@ -100,18 +108,21 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
                 new_row['Id'] = f"{datetime.now().strftime('%d%m%Y')}{id_counter:06d}"
                 id_counter += 1
                 new_rows.append(new_row)
-            logging.info(f"Объявление '{title}': добавлены строки в количестве {len(missing_cities)} шт.")
+            #logger.info(f"Объявление '{title}': добавлены строки в количестве {len(missing_cities)} шт.")
     if new_rows:
         df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
-        logging.info(f"Всего добавлено строк: {len(new_rows)}")
+        logger.info(f"Валидация размещения по всем городам завершена. Всего добавлено новых строк: {len(new_rows)}")
     else:
-        logging.info("Все товары размещены в нужных городах. Новые строки не добавлялись.")
+        logger.info("Все товары размещены в нужных городах. Новые строки не добавлялись.")
+    #logger.info(df.tail(5))
+    #logger.info(f"Размер итогового DataFrame: {df.shape}")
     return df
 
 def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
     """Функция нормализации колонок Condition, Year, Kilometrage, DisplayAreas - приведение к единым значениям"""
 
     current_year = datetime.now().year
+    df['AvitoStatus'] = 'Активно'
     df.loc[df['Condition'] != 'Б/у', 'Condition'] = 'Б/у'
     df.loc[df['Year'] != current_year, 'Year'] = current_year
     df.loc[df['Kilometrage'] != 5, 'Kilometrage'] = 5
@@ -120,7 +131,34 @@ def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
-    df['Address'] = df.apply(lambda row: normalize_addresses(row['Address'], row['AvitoId']), axis=1)
+    """Функция нормализации адресов + удаление ненормализованных"""
+
+    original_len = len(df)
+    normalized_addresses = []
+    error_messages = []
+
+    for _, row in df.iterrows():
+        is_valid, result = normalize_addresses(row['Address'], row['AvitoId'])
+        if is_valid:
+            normalized_addresses.append(result)
+            error_messages.append(None)
+        else:
+            normalized_addresses.append(None)
+            error_messages.append(result)
+
+    df['Address'] = normalized_addresses
+    df['address_error'] = error_messages
+
+    df = df[df['Address'].notna()].reset_index(drop=True)
+    removed = original_len - len(df)
+
+    if removed > 0:
+        logger.warning(f"Удалено строк с ненормализованным адресом: {removed} шт.")
+        logger.warning(f"Список ненормализованных адресов:")
+        for msg in filter(None, error_messages):
+            logger.warning(msg)
+
+    df.drop(columns='address_error', inplace=True)
     return df
 
 def normalize_group(group: pd.DataFrame, columns_to_normalize: list) -> pd.DataFrame:
@@ -160,14 +198,14 @@ def convert_data_types(df: pd.DataFrame) -> pd.DataFrame:
                 df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
         except Exception as e:
             errors.append(f"Ошибка при приведении колонки {col} к типу int: {e}")
-            logging.error(errors[-1])
+            logger.error(errors[-1])
     for col in existing_string_columns:
         try:
             if not pd.api.types.is_string_dtype(df[col]):
                 df[col] = df[col].astype('string')
         except Exception as e:
             errors.append(f"Ошибка при приведении колонки {col} к типу string: {e}")
-            logging.error(errors[-1])
+            logger.error(errors[-1])
     if errors:
-        logging.warning(f"Обнаружено {len(errors)} ошибок при приведении типов. См. логи выше.")
+        logger.warning(f"Обнаружено {len(errors)} ошибок при приведении типов. См. логи выше.")
     return df
