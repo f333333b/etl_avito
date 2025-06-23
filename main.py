@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
-    format='%(asctime)s | %(levelname)-5s| %(name)-15s| %(lineno)-4d| %(funcName)-28s| %(message)s'
+    format='%(asctime)s | %(levelname)-8s| %(name)-15s| %(lineno)-4d| %(funcName)-28s| %(message)s'
 )
 
 
@@ -63,13 +63,13 @@ def run_etl():
         logger.info("=== EXCTRACT ===")
         df = read_excel_file(config['INPUT_PATH'])
 
-        # валидация
-        logger.info("=== VALIDATION ===")
-        validate_data(df)
-
         # трансформация
         logger.info("=== TRANSFORM ===")
         df = transform_pipeline(df, pipeline_config)
+
+        # валидация
+        logger.info("=== VALIDATION ===")
+        validate_data(df)
 
         # загрузка
         logger.info("=== LOAD ===")
