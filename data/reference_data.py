@@ -64,7 +64,8 @@ autoload_allowed_values = {
         'data_type': str
     },
     'AdStatus': {
-        'allowed_values': ['Free', 'Highlight', 'XL', 'x2_1', 'x2_7', 'x5_1', 'x5_7', 'x10_1', 'x10_7', 'x15_1', 'x15_7', 'x20_1', 'x20_7'],
+        'allowed_values': ['Free', 'Highlight', 'XL', 'x2_1', 'x2_7', 'x5_1', 'x5_7', 'x10_1', 'x10_7', 'x15_1',
+                           'x15_7', 'x20_1', 'x20_7'],
         'required_parameter': False,
         'data_type': str
     },
@@ -114,7 +115,10 @@ autoload_allowed_values = {
         'data_type': str
     },
     'Delivery': {
-        'allowed_values': ['Выключена', 'ПВЗ', 'Курьер', 'Постамат', 'Свой курьер', 'Свой партнер СДЭК', 'Свой партнер Деловые Линии', 'Свой партнер DPD', 'Свой партнер ПЭК', 'Свой партнер Почта России', 'Свой партнер Boxberry', 'Свой партнер СДЭК курьер', 'Самовывоз с онлайн-оплатой'],
+        'allowed_values': ['Выключена', 'ПВЗ', 'Курьер', 'Постамат', 'Свой курьер', 'Свой партнер СДЭК',
+                           'Свой партнер Деловые Линии', 'Свой партнер DPD', 'Свой партнер ПЭК',
+                           'Свой партнер Почта России', 'Свой партнер Boxberry', 'Свой партнер СДЭК курьер',
+                           'Самовывоз с онлайн-оплатой'],
         'required_parameter': False,
         'data_type': str
     },
@@ -155,7 +159,7 @@ autoload_allowed_values = {
     },
     'Price': {
         'allowed_values': None,
-        'required_parameter': True,
+        'required_parameter': False,
         'data_type': int
     },
     'VehicleType': {
@@ -174,63 +178,19 @@ autoload_allowed_values = {
         'data_type': str
     },
     'Type': {
-        'Мопеды и скутеры': {
-            'allowed_values': ['Скутер', 'Макси-скутер', 'Мопед', 'Минибайк'],
-            'required_parameter': True,
-            'data_type': str
-        },
-        'Квадроциклы': {
-            'allowed_values': ['Багги', 'Утилитарный', 'Спортивный', 'Туристический', 'Детский'],
-            'required_parameter': True,
-            'data_type': str
-        },
-        'Мотоциклы': {
-            'allowed_values': ['Круизер или чоппер', 'Спортбайк', 'Туристический', 'Спорт-турист', 'Тур-эндуро', 'Трицикл', 'Naked bike', 'Мотард', 'Эндуро', 'Кроссовый', 'Питбайк', 'Триал', 'Детский', 'Кастом'],
-            'required_parameter': True,
-            'data_type': str
-        },
-        'Снегоходы': {
-            'allowed_values': ['Утилитарный', 'Спортивный или горный', 'Туристический', 'Детский', 'Мотобуксировщик'],
-            'required_parameter': True,
-            'data_type': str
-        },
-        'Моторные лодки и моторы': {
-            'allowed_values': ['Лодка ПВХ (надувная)', 'Лодка RIB (комбинированная)', 'Лодка с жестким корпусом', 'Лодочный мотор'],
-            'required_parameter': True,
-            'data_type': str
-        }
-    },
-    'Year': {
-        'allowed_values': None,
+        'allowed_values': ['Скутер', 'Макси-скутер', 'Мопед', 'Минибайк', 'Багги', 'Утилитарный', 'Спортивный',
+                            'Туристический', 'Детский', 'Круизер или чоппер', 'Спортбайк', 'Туристический',
+                           'Спорт-турист', 'Тур-эндуро', 'Трицикл', 'Naked bike', 'Мотард', 'Эндуро', 'Кроссовый',
+                           'Питбайк', 'Триал', 'Детский', 'Кастом', 'Утилитарный', 'Спортивный или горный',
+                           'Туристический', 'Детский', 'Мотобуксировщик', 'Лодка ПВХ (надувная)',
+                           'Лодка RIB (комбинированная)', 'Лодка с жестким корпусом', 'Лодочный мотор'],
         'required_parameter': True,
-        'data_type': int
+        'data_type': str
     },
     'EngineType': {
-        'Мопеды и скутеры': {
-            'allowed_values': ['Бензин', 'Электро'],
-            'required_parameter': False,
-            'data_type': str
-        },
-        'Квадроциклы': {
-            'allowed_values': ['Бензин', 'Электро'],
-            'required_parameter': False,
-            'data_type': str
-        },
-        'Мотоциклы': {
-            'allowed_values': ['Бензин', 'Электро'],
-            'required_parameter': False,
-            'data_type': str
-        },
-        'Снегоходы': {
-            'allowed_values': ['Бензин', 'Электро'],
-            'required_parameter': False,
-            'data_type': str
-        },
-        'Моторные лодки и моторы': {
-            'allowed_values': ['Бензин', 'Дизель', 'Электро', 'Болотоход', 'Водомёт'],
-            'required_parameter': True,
-            'data_type': str
-        }
+        'allowed_values': ['Бензин', 'Дизель', 'Электро', 'Болотоход', 'Водомёт'],
+        'required_parameter': True,
+        'data_type': str
     },
     'Power': {
         'allowed_values': None,
@@ -313,17 +273,13 @@ autoload_allowed_values = {
         'data_type': int
     },
     'FloorType': {
-        'Лодка ПВХ (надувная)': {
-            'allowed_values': ['Натяжное', 'Надувное', 'Реечное', 'С жесткими пайолами', 'Килевое', 'С жесткими пайолами и килем', 'С надувным килем', 'Реечное с надувным килем', 'Килевое с надувным дном низкого давления', 'С надувным дном высокого давления', 'С надувным дном низкого давления', 'Другое'],
-            'required_parameter': True,
-            'data_type': str
+        'allowed_values': ['Натяжное', 'Надувное', 'Реечное', 'С жесткими пайолами', 'Килевое',
+                            'С жесткими пайолами и килем', 'С надувным килем', 'Реечное с надувным килем',
+                            'Килевое с надувным дном низкого давления', 'С надувным дном высокого давления',
+                            'С надувным дном низкого давления', 'Стеклопластиковое', 'Алюминиевое', 'Другое'],
+        'required_parameter': False,
+        'data_type': str
         },
-        'Лодка RIB (комбинированная)': {
-            'allowed_values': ['Стеклопластиковое', 'Алюминиевое'],
-            'required_parameter': True,
-            'data_type': str
-        }
-    },
     'Length': {
         'allowed_values': None,
         'required_parameter': False,
@@ -352,7 +308,7 @@ autoload_allowed_values = {
     'MaxPower': {
         'allowed_values': None,
         'required_parameter': False,
-        'data_type': float
+        'data_type': int
     },
     'Material': {
         'allowed_values': ['Алюминий', 'Дюралюминий', 'Сталь', 'Пластик', 'Стеклопластик', 'Дерево', 'Кевлар', 'Алюминий и стеклопластик', 'Другое'],
