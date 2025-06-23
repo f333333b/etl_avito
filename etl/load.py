@@ -58,16 +58,29 @@ def load(df: pd.DataFrame, config: Dict) -> None:
         save_to_excel(df, config)
 
 def save_to_excel(df: pd.DataFrame, config: Dict) -> str:
+    """Функция сохранения обработанного файла"""
     df = df.copy()
     path = config['OUTPUT_PATH']
     folder = os.path.dirname(path)
     ensure_dir_created(folder)
+
     for col in df.select_dtypes(include=["datetimetz"]).columns:
         df[col] = df[col].dt.tz_localize(None)
-    with excel_writer(path) as fname:
-        df.to_excel(fname, index=False)
-        logger.info(f"Файл успешно сохранён: {fname}")
-    return path
+
+    try:
+        with excel_writer(path) as fname:
+            df.to_excel(fname, index=False)
+        logger.info(f"Файл успешно сохранён: {path}")
+        return path
+    except PermissionError:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        dir_name, file_name = os.path.split(path)
+        name, ext = os.path.splitext(file_name)
+        new_path = os.path.join(dir_name, f"{name}_{timestamp}{ext}")
+        with excel_writer(new_path) as fname:
+            df.to_excel(fname, index=False)
+        logger.warning(f"Основной файл занят. Сохранено как: {new_path}")
+        return new_path
 
 def autoload_api_main(df: pd.DataFrame, config: Dict) -> None:
     email = config['EMAIL']
