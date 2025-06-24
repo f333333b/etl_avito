@@ -21,7 +21,7 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
 
     # подсчет количества удаленных строк
     removed = len(df) - len(df_cleaned)
-    logger.info(f'Удалено мусорных/пустых строк: {removed}')
+    logger.info(f'Удалено мусорных/пустых строк: {removed} шт.')
 
     return df_cleaned
 
@@ -30,6 +30,7 @@ def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
 
     #logger.info(f"Перед нормализацией по Title: {df.shape[0]} строк")
 
+    df['AvitoDateEnd'] = df['AvitoDateEnd'].astype(str)
     df['AvitoDateEnd'] = pd.to_datetime(df['AvitoDateEnd'], errors='coerce')
     df['StatusPriority'] = df['AvitoStatus'].apply(lambda x: 1 if x == 'Активно' else 0)
 
@@ -44,6 +45,7 @@ def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
 
     #logger.info(f"Количество нормализованных строк по колонке 'Title': {df_sorted.shape[0]}.")
     #logger.info(f"После нормализации по Title: {df_sorted.shape[0]} строк")
+    logger.info(f"Удалено дубликатов по 'Title+Address': {len(df) - len(df_sorted)} шт.")
 
     return df_sorted
 
@@ -74,14 +76,14 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
     if invalid_ids:
         logger.info(f"Удалены строки с нарушением дилерства: {len(invalid_ids)} шт.")
         invalid_list = [int(avito_id) for avito_id in invalid_ids]
-        logger.info(f"Список AvitoId удаленных строк:")
-        logger.info(invalid_list)
+        #logger.info(f"Список AvitoId удаленных строк:")
+        #logger.info(invalid_list)
     else:
         logger.info("Нарушений дилерства не обнаружено")
     return result_df
 
 def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
-    """Функция валидации размещения по всем городам согласно Title и Make"""
+    """Функция проверки размещения по всем городам согласно Title и Make"""
 
     id_counter = 1
     new_rows = []
@@ -111,7 +113,8 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
             #logger.info(f"Объявление '{title}': добавлены строки в количестве {len(missing_cities)} шт.")
     if new_rows:
         df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
-        logger.info(f"Валидация размещения по всем городам завершена. Всего добавлено новых строк: {len(new_rows)}")
+        # отнимаем 1 - строку с названиями колонок
+        logger.info(f"Проверка на размещение по городам. Добавлено новых строк: {len(new_rows)} шт.")
     else:
         logger.info("Все товары размещены в нужных городах. Новые строки не добавлялись.")
     #logger.info(df.tail(5))
@@ -123,11 +126,14 @@ def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
 
     current_year = datetime.now().year
     df['AvitoStatus'] = 'Активно'
-    df.loc[df['Condition'] != 'Б/у', 'Condition'] = 'Б/у'
     df.loc[df['Year'] != current_year, 'Year'] = current_year
-    df.loc[df['Kilometrage'] != 5, 'Kilometrage'] = 5
-    df['DisplayAreas'] = df['DisplayAreas'].astype(str)
-    df.loc[df['DisplayAreas'] != '', 'DisplayAreas'] = ''
+    if 'Condition' in df.columns:
+        df.loc[df['Condition'] != 'Б/у', 'Condition'] = 'Б/у'
+    if 'Kilometrage' in df.columns:
+        df.loc[df['Kilometrage'] != 5, 'Kilometrage'] = 5
+    if 'DisplayAreas' in df.columns:
+        df['DisplayAreas'] = df['DisplayAreas'].astype(str)
+        df.loc[df['DisplayAreas'] != '', 'DisplayAreas'] = ''
     return df
 
 def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
@@ -153,59 +159,56 @@ def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
     removed = original_len - len(df)
 
     if removed > 0:
-        logger.warning(f"Удалено строк с ненормализованным адресом: {removed} шт.")
-        logger.warning(f"Список ненормализованных адресов:")
-        for msg in filter(None, error_messages):
-            logger.warning(msg)
+        logger.info(f"Удалено строк с ненормализованным адресом: {removed} шт.")
+
+        #logger.info(f"Список ненормализованных адресов:")
+        #for msg in filter(None, error_messages):
+        #    logger.info(msg)
 
     df.drop(columns='address_error', inplace=True)
     return df
 
-def normalize_group(group: pd.DataFrame, columns_to_normalize: list) -> pd.DataFrame:
-    if group['AvitoDateEnd'].notna().any():
-        idx = group['AvitoDateEnd'].idxmax()
-    else:
-        idx = group.index[0]
-    ref_row = group.loc[idx, columns_to_normalize]
-    for col in columns_to_normalize:
-        group[col] = ref_row[col]
-    return group
-
-def convert_data_types(df: pd.DataFrame) -> pd.DataFrame:
-    """Функция приведения типов данных определённых колонок"""
+def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.DataFrame:
+    """Функция приведения типов данных колонок из справочника"""
     df = df.copy()
-    numeric_columns = [
-        "AvitoId", "Price", "EngineCapacity", "Kilometrage", "PersonCapacity",
-        "SeatingCapacity", "MaxPower", "Stroke", "TrackWidth"
-    ]
-    string_columns = [
-        "Id", "AvitoStatus", "AvitoDateEnd", "ListingFee", "Category", "Title",
-        "Description", "Condition", "ImageUrls", "VideoUrl", "Address", "ManagerName",
-        "EMail", "ContactPhone", "ContactMethod", "Availability", "CompanyName", "Control",
-        "Cylinders", "CylindersPosition", "DisplayAreas", "DriveType",
-        "EngineCooling", "EngineIncluded", "EngineMake", "EngineType", "EngineWeight",
-        "EngineYear", "FloorType", "FuelFeed", "Length", "Make",
-        "Model", "MotoType", "NumberOfGears", "Owners", "ShaftLength", "StartingSystem",
-        "TechnicalPassport", "TrailerIncluded", "Transmission", "TransomHeight", "Type",
-        "VehicleType", "VIN", "Weight", "Width"
-    ]
-    existing_numeric_columns = [col for col in numeric_columns if col in df.columns]
-    existing_string_columns = [col for col in string_columns if col in df.columns]
     errors = []
-    for col in existing_numeric_columns:
+
+    for column, props in autoload_allowed_values.items():
+        if column not in df.columns:
+            continue
+
+        target_type = props.get("data_type")
         try:
-            if not pd.api.types.is_integer_dtype(df[col]):
-                df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
+            if target_type is str:
+                if column == 'ContactPhone':
+                    df[column] = df[column].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+                else:
+                    df[column] = df[column].astype('string').fillna('')
+            elif target_type is int:
+                df[column] = pd.to_numeric(df[column], errors='coerce').fillna(0)
+                df[column] = df[column].apply(lambda x: int(x) if pd.notna(x) else pd.NA).astype('Int64')
+            elif target_type is float:
+                df[column] = pd.to_numeric(df[column], errors='coerce')
+            elif target_type is datetime:
+                df[column] = pd.to_datetime(df[column], errors='coerce')
+            else:
+                raise ValueError(f"Неизвестный тип {target_type} для колонки {column}")
         except Exception as e:
-            errors.append(f"Ошибка при приведении колонки {col} к типу int: {e}")
-            logger.error(errors[-1])
-    for col in existing_string_columns:
-        try:
-            if not pd.api.types.is_string_dtype(df[col]):
-                df[col] = df[col].astype('string')
-        except Exception as e:
-            errors.append(f"Ошибка при приведении колонки {col} к типу string: {e}")
-            logger.error(errors[-1])
+            error_msg = f"Ошибка при приведении {column} к {target_type}: {e}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+
     if errors:
-        logger.warning(f"Обнаружено {len(errors)} ошибок при приведении типов. См. логи выше.")
+        logger.info(f"Обнаружено {len(errors)} ошибок при приведении типов")
+
+    return df
+
+def remove_duplicates_keep_latest(df: pd.DataFrame) -> pd.DataFrame:
+    """Функция удаления дубликатов"""
+    df = df.copy()
+
+    for column in ['AvitoId', 'Id']:
+        df = df.sort_values('AvitoDateEnd', ascending=False)
+        df = df.drop_duplicates(subset=column, keep='first').reset_index(drop=True)
+
     return df

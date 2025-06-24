@@ -45,7 +45,7 @@ city_to_full_address = {
 autoload_allowed_values = {
     'Id': {
         'allowed_values': None,
-        'required_parameter': True,
+        'required_parameter': False,
         'data_type': str
     },
     'DateBegin': {
@@ -73,6 +73,11 @@ autoload_allowed_values = {
         'allowed_values': None,
         'required_parameter': False,
         'data_type': int
+    },
+    'AvitoStatus': {
+        'allowed_values': ['Активно', 'Отклонено', 'Заблокировано'],
+        'required_parameter': True,
+        'data_type': str
     },
     'ManagerName': {
         'allowed_values': None,
@@ -163,18 +168,19 @@ autoload_allowed_values = {
         'data_type': int
     },
     'VehicleType': {
-        'allowed_values': ['Мопеды и скутеры', 'Квадроциклы', 'Мотоциклы', 'Снегоходы', 'Моторные лодки и моторы'],
+        'allowed_values': ['Мопеды и скутеры', 'Квадроциклы', 'Мотоциклы', 'Снегоходы', 'Моторные лодки и моторы',
+                           'Вёсельные лодки'],
         'required_parameter': True,
         'data_type': str
     },
     'Make': {
         'allowed_values': None,
-        'required_parameter': True,
+        'required_parameter': False,
         'data_type': str
     },
     'Model': {
         'allowed_values': None,
-        'required_parameter': True,
+        'required_parameter': False,
         'data_type': str
     },
     'Type': {
@@ -184,18 +190,18 @@ autoload_allowed_values = {
                            'Питбайк', 'Триал', 'Детский', 'Кастом', 'Утилитарный', 'Спортивный или горный',
                            'Туристический', 'Детский', 'Мотобуксировщик', 'Лодка ПВХ (надувная)',
                            'Лодка RIB (комбинированная)', 'Лодка с жестким корпусом', 'Лодочный мотор'],
-        'required_parameter': True,
+        'required_parameter': False,
         'data_type': str
     },
     'EngineType': {
         'allowed_values': ['Бензин', 'Дизель', 'Электро', 'Болотоход', 'Водомёт'],
-        'required_parameter': True,
+        'required_parameter': False,
         'data_type': str
     },
     'Power': {
         'allowed_values': None,
         'required_parameter': True,
-        'data_type': float
+        'data_type': int
     },
     'EngineCapacity': {
         'allowed_values': None,
@@ -409,6 +415,11 @@ autoload_allowed_values = {
         'allowed_values': None,
         'required_parameter': False,
         'data_type': str
+    },
+    'Year': {
+        'allowed_values': None,
+        'required_parameter': False,
+        'data_type': int
     }
 }
 
