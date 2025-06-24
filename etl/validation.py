@@ -1,75 +1,45 @@
 import re
-import os
 import pandas as pd
-import requests
 import logging
-import time
+import asyncio
 import random
-from datetime import datetime
 from typing import List, Optional, Tuple
 
-from etl.load import excel_writer
+import aiohttp
+
 from data.reference_data import autoload_allowed_values
-from utils import ensure_dir_created
 
 logger = logging.getLogger(__name__)
+
+# регулярные выражения
+PATTERN_CONTACT_PHONE = re.compile(
+    r'^\+?7\s?\(?[\d]{3}\)?[\s-]?[\d]{3}[\s-]?[\d]{2}[\s-]?[\d]{2}$'
+)
+PATTERN_ID = re.compile(r'^[\dа-яА-Яa-zA-Z,\\/\[\]\(\)\-=_]{1,100}$')
+PATTERN_AVITO_ID = re.compile(r'^\d+$')
 
 def get_duplicated_values(series: pd.Series) -> pd.Series:
     """Вспомогательная функция, которая возвращает уникальные значения, дублирующиеся в серии"""
     return series[series.duplicated()].unique()
 
-def get_duplicated_rows(df: pd.DataFrame, column: str, skip_empty: bool = True) -> pd.DataFrame:
-    """Вспомогательная функция, которая возвращает строки, содержащие дублирующиеся значения в заданной колонке"""
-    if skip_empty:
-        mask = df[column].notna()
-    else:
-        mask = pd.Series([True] * len(df))
-    filtered = df[mask]
-    return filtered[filtered[column].duplicated(keep=False)]
-
-def save_duplicates_to_excel(df: pd.DataFrame, column: str) -> str:
-    """Вспомогательная функция для сохранения дубликатов в Excel-файл"""
-
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    folder = f"{project_root}\\validation_logs"
-    ensure_dir_created(folder)
-    filename = f"{folder}\\duplicates_{column}_{timestamp}.xlsx"
-    with excel_writer(filename) as fname:
-        df.to_excel(fname, index=False)
-    logger.info(f"Дубликаты сохранены в файл: {filename}")
-    return filename
-
-def validate_uniqueness(df: pd.DataFrame) -> tuple[bool, List[str]]:
-    """Функция валидации уникальности колонок AvitoId и Id"""
-    errors = []
-    for column, skip_empty in [('AvitoId', True), ('Id', False)]:
-        duplicated_df = get_duplicated_rows(df, column, skip_empty)
-        if not duplicated_df.empty and duplicated_df[column].nunique() > 0:
-            file_path = save_duplicates_to_excel(duplicated_df, column)
-            errors.append(
-                f"Найдены дубликаты в '{column}' (всего: {duplicated_df[column].nunique()}). Сохранено в: {file_path}"
-            )
-    return len(errors) == 0, errors
-
-def check_url(session: requests.Session, id: str, url: str, delay_range=(0.2, 0.5)) -> Optional[str]:
+async def check_url(session: aiohttp.ClientSession, id: str, url: str, sem: asyncio.Semaphore, delay_range=(0.2, 0.5)) -> Optional[str]:
     """Вспомогательная функция для проверки одного URL"""
     if pd.isna(url) or str(url).strip() == '':
         return None
     if not url.startswith(('http://', 'https://')):
         return f"Некорректный формат URL в строке с Id {id}: {url}"
-    try:
-        time.sleep(random.uniform(*delay_range))
-        response = session.head(url, timeout=5, allow_redirects=True)
-        if response.status_code != 200:
-            return f"URL {url} в строке с Id {id} вернул статус {response.status_code}"
-    except requests.RequestException as e:
-        return f"Ошибка при HEAD-запросе к {url} в строке с Id {id}: {e}"
+    async with sem:
+        try:
+            await asyncio.sleep(random.uniform(*delay_range))
+            async with session.head(url, timeout=5, allow_redirects=True) as response:
+                if response.status != 200:
+                    return f"URL {url} в строке с Id {id} вернул статус {response.status}"
+        except Exception as e:
+            return f"Ошибка при HEAD-запросе к {url} в строке с Id {id}: {e}"
     return None
 
-def validate_urls(df: pd.DataFrame) -> tuple[bool, List[str]]:
+async def validate_urls(df: pd.DataFrame) -> tuple[bool, List[str]]:
     """Функция валидации значений колонок VideoURL и VideoFilesURL"""
-
     HEADERS = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -80,28 +50,29 @@ def validate_urls(df: pd.DataFrame) -> tuple[bool, List[str]]:
     errors = []
     url_columns = ['VideoURL', 'VideoFilesURL', 'ImageUrls']
     total_checked = 0
-    with requests.Session() as session:
-        session.headers.update(HEADERS)
+    sem = asyncio.Semaphore(5)
+
+    unique_df = df.drop_duplicates(subset=['Title'])
+
+    async with aiohttp.ClientSession(headers=HEADERS) as session:
+        tasks = []
         for col in url_columns:
-            if col not in df.columns:
-                logger.warning(f"Колонка {col} отсутствует, проверка пропущена")
+            if col not in unique_df.columns:
                 continue
-            # отключить, потому что нужно проработать, как обойти ограничение авито на частые запросы (to do)
             if col == 'ImageUrls':
-                for row_id, image_urls in df[col].astype(str).items():
+                for row_id, image_urls in unique_df[col].astype(str).items():
                     if image_urls.strip():
-                        first_image_url = image_urls.split('|')[0]
+                        first_image_url = image_urls.split('|')[0].strip()
                         total_checked += 1
-                        check_result = check_url(session=session, id=row_id, url=first_image_url.strip())
-                        time.sleep(2)
-                        if check_result:
-                            errors.append(check_result)
+                        tasks.append(check_url(session, str(row_id), first_image_url, sem))
+                        await asyncio.sleep(2)
             else:
-                for row_id, url in df[col].items():
+                for row_id, url in unique_df[col].items():
                     total_checked += 1
-                    check_result = check_url(session=session, id=row_id, url=url)
-                    if check_result:
-                        errors.append(check_result)
+                    tasks.append(check_url(session, str(row_id), url, sem))
+        results = await asyncio.gather(*tasks)
+        errors.extend(result for result in results if result)
+
     if not errors:
         logger.info("Проверка URL пройдена успешно")
     logger.info(f"Всего URL проверено: {total_checked}, найдено ошибок: {len(errors)}")
@@ -109,11 +80,9 @@ def validate_urls(df: pd.DataFrame) -> tuple[bool, List[str]]:
 
 def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     """Функция валидации обязательных колонок: наличие, заполненность, допустимые значения, тип данных"""
-
     errors = []
     required_columns = [key for key, val in autoload_allowed_values.items() if val['required_parameter']]
 
-    # валидация наличия колонок
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         errors.append(f"Отсутствуют обязательные колонки: {', '.join(missing_columns)}")
@@ -121,24 +90,13 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     present_required = [col for col in required_columns if col in df.columns]
 
     def check_row(row: pd.Series) -> Optional[str]:
-        missing = []
-        invalid = []
-        wrong_type = []
-
-        for col in present_required:
-            val = row[col]
-
-            if pd.isna(val) or str(val).strip() == "":
-                missing.append(col)
-                continue
-
-            allowed = autoload_allowed_values[col].get('allowed_values')
-            if allowed is not None and val not in allowed:
-                invalid.append(col)
-
-            expected_type = autoload_allowed_values[col].get('data_type')
-            if expected_type and not isinstance(val, expected_type):
-                wrong_type.append(col)
+        missing = [col for col in present_required if pd.isna(row[col]) or str(row[col]).strip() == ""]
+        invalid = [col for col in present_required if not pd.isna(row[col])
+                   and autoload_allowed_values[col].get('allowed_values')
+                   and row[col] not in autoload_allowed_values[col]['allowed_values']]
+        wrong_type = [col for col in present_required if not pd.isna(row[col])
+                      and autoload_allowed_values[col].get('data_type')
+                      and not isinstance(row[col], autoload_allowed_values[col]['data_type'])]
 
         messages = []
         if missing:
@@ -150,11 +108,11 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
             plural_wrong_type = "колонки" if len(wrong_type) == 1 else "колонок"
             messages.append(f"неверный тип данных у {plural_wrong_type}: {', '.join(wrong_type)}")
 
-        if messages:
-            return f"Строка {row.name}: " + "; ".join(messages)
-        return None
+        return f"Строка {row.name}: " + "; ".join(messages) if messages else None
 
     errors.extend(df.apply(check_row, axis=1).dropna().tolist())
+    if len(errors) > 30:
+        return False, errors[:30]
     return len(errors) == 0, errors
 
 def validate_format_fields(df: pd.DataFrame) -> tuple[bool, List[str]]:
@@ -162,29 +120,23 @@ def validate_format_fields(df: pd.DataFrame) -> tuple[bool, List[str]]:
     errors = []
     is_valid = True
 
-    if 'EMail' in df.columns:
-        invalid_emails = df[~df['EMail'].fillna('').astype(str).str.match(r"[^@]+@[^@]+\.[^@]+")]
-        if not invalid_emails.empty:
-            is_valid = False
-            errors.append(f"Некорректные email: {len(invalid_emails)} строк")
+    df['ContactPhone'] = df['ContactPhone'].fillna('').astype(str).str.replace(r'\.0$', '', regex=True)
+    invalid_phones = df[(df['ContactPhone'] != '') & (df['ContactPhone'].str.match(PATTERN_CONTACT_PHONE, na=False) == False)]
+    if not invalid_phones.empty:
+        is_valid = False
+        errors.append(f"Некорректные номера телефонов: {invalid_phones['ContactPhone'].tolist()}")
 
-    if 'ContactPhone' in df.columns:
-        invalid_phones = df[~df['ContactPhone'].fillna('').astype(str).str.fullmatch(r"7\d{10}")]
-        if not invalid_phones.empty:
-            is_valid = False
-            errors.append(f"Некорректные номера телефонов: {len(invalid_phones)} строк")
+    ids_str = df['Id'].fillna('').astype(str)
+    invalid_ids = df[(ids_str != '') & (ids_str.str.match(PATTERN_ID, na=False) == False)]
+    if not invalid_ids.empty:
+        is_valid = False
+        errors.append(f"Некорректные Id: {invalid_ids['Id'].tolist()}")
 
-    if 'Id' in df.columns:
-        invalid_ids = df[~df['Id'].fillna('').astype(str).str.fullmatch(r"[A-Za-z0-9]+")]
-        if not invalid_ids.empty:
-            is_valid = False
-            errors.append(f"Некорректные Id: {len(invalid_ids)} строк")
-
-    if 'AvitoId' in df.columns:
-        invalid_avito_ids = df[~df['AvitoId'].astype(str).str.fullmatch(r"\d+")]
-        if not invalid_avito_ids.empty:
-            is_valid = False
-            errors.append(f"Некорректные AvitoId: {len(invalid_avito_ids)} строк")
+    avito_ids = df['AvitoId'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+    invalid_avito_ids = df[(avito_ids != '') & (avito_ids.str.match(PATTERN_AVITO_ID, na=False) == False)]
+    if not invalid_avito_ids.empty:
+        is_valid = False
+        errors.append(f"Некорректные AvitoId ({len(invalid_avito_ids)}): {invalid_avito_ids['AvitoId'].tolist()}")
 
     return is_valid, errors
 
@@ -193,22 +145,16 @@ def validate_data(df: pd.DataFrame) -> tuple[bool, List[str]]:
     errors = []
     is_valid = True
 
-    # валидация уникальности
-    valid, uniq_errors = validate_uniqueness(df)
-    errors.extend(uniq_errors)
-    is_valid &= valid
-
-    # валидация обязательных полей
     valid, req_errors = validate_required_fields(df)
     errors.extend(req_errors)
     is_valid &= valid
 
-    # валидация URL
-    #valid, url_errors = validate_urls(df)
+    # валидация URL (отключена для более быстрого тестирования)
+    #loop = asyncio.get_event_loop()
+    #valid, url_errors = loop.run_until_complete(validate_urls(df))
     #errors.extend(url_errors)
     #is_valid &= valid
 
-    # валидация форматов
     valid, format_errors = validate_format_fields(df)
     errors.extend(format_errors)
     is_valid &= valid

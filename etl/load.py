@@ -22,7 +22,7 @@ def excel_writer(filename: str):
         logger.error(f"Ошибка при записи файла {filename}: {e}")
         raise
 
-# Пробная версия кастомного контекстного менеджера с подсчетом времени работы
+# пробная версия кастомного контекстного менеджера с подсчетом времени работы
 class ExcelWriter:
     def __init__(self, df: pd.DataFrame, filename: str, log: bool = True, **kwargs):
         self.df = df
@@ -55,12 +55,14 @@ def load(df: pd.DataFrame, config: Dict) -> None:
     if api_flag:
         autoload_api_main(df, config)
     else:
-        save_to_excel(df, config)
+        save_dataframe(df, config)
 
-def save_to_excel(df: pd.DataFrame, config: Dict) -> str:
-    """Функция сохранения обработанного файла"""
+def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
+    """Функция сохранения обработанного файла (Excel или CSV)"""
+
     df = df.copy()
     path = config['OUTPUT_PATH']
+    ext = os.path.splitext(path)[1].lower()
     folder = os.path.dirname(path)
     ensure_dir_created(folder)
 
@@ -68,19 +70,32 @@ def save_to_excel(df: pd.DataFrame, config: Dict) -> str:
         df[col] = df[col].dt.tz_localize(None)
 
     try:
-        with excel_writer(path) as fname:
-            df.to_excel(fname, index=False)
+        if ext in [".xlsx", ".xls"]:
+            with excel_writer(path) as fname:
+                df.to_excel(fname, index=False)
+        elif ext == ".csv":
+            df.to_csv(path, index=False, encoding="utf-8-sig")
+        else:
+            raise ValueError(f"Неподдерживаемое расширение файла: {ext}")
+
         logger.info(f"Файл успешно сохранён: {path}")
-        return path
     except PermissionError:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         dir_name, file_name = os.path.split(path)
         name, ext = os.path.splitext(file_name)
-        new_path = os.path.join(dir_name, f"{name}_{timestamp}{ext}")
-        with excel_writer(new_path) as fname:
-            df.to_excel(fname, index=False)
-        logger.warning(f"Основной файл занят. Сохранено как: {new_path}")
-        return new_path
+        path = os.path.join(dir_name, f"{name}_{timestamp}{ext}")
+        if ext == ".xlsx":
+            with excel_writer(path) as fname:
+                df.to_excel(fname, index=False)
+        elif ext == ".csv":
+            df.to_csv(path, index=False, encoding="utf-8-sig")
+        logger.warning(f"Основной файл занят. Сохранено как: {path}")
+
+    file_size = os.path.getsize(path)
+    logger.info(f"Размер файла: {file_size / (1024 ** 2):.2f} МБ. Количество строк: {len(df)}")
+
+    return path
+
 
 def autoload_api_main(df: pd.DataFrame, config: Dict) -> None:
     email = config['EMAIL']
