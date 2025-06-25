@@ -1,7 +1,8 @@
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
 
 def ensure_file_exists(path: str) -> None:
     """Функция проверки существования файла"""
@@ -10,6 +11,7 @@ def ensure_file_exists(path: str) -> None:
     if not os.path.isfile(path):
         logger.error(f"Файл не найден: {path}")
         raise FileNotFoundError(f"Файл не найден: {path}")
+
 
 def ensure_dir_created(path: str) -> None:
     """Функция проверки существования папки. При отсутствии создает папку"""
