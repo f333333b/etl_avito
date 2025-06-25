@@ -1,9 +1,8 @@
 import logging
 import os
-import time
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import requests
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def excel_writer(filename: str):
+def excel_writer(filename: str) -> None:
     """Функция - контекстный менеджер для записи Excel-файла"""
     try:
         yield filename
@@ -25,34 +24,34 @@ def excel_writer(filename: str):
 
 
 # пробная версия кастомного контекстного менеджера с подсчетом времени работы
-class ExcelWriter:
-    def __init__(self, df: pd.DataFrame, filename: str, log: bool = True, **kwargs):
-        self.df = df
-        self.filename = filename
-        self.log = log
-        self.start_time = None
-        self.kwargs = kwargs
-
-    def __enter__(self):
-        if self.log:
-            logger.info(f"Начало записи: {self.filename}")
-        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
-        self.start_time = time.perf_counter()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        duration = time.perf_counter() - self.start_time
-        if exc_type:
-            logger.error(f"Ошибка при записи {self.filename}: {exc_val}")
-        else:
-            logger.info(
-                f"Файл записан: {self.filename} "
-                f"(строк: {len(self.df)}, время: {duration:.2f} сек)"
-            )
-        return False
-
-    def save(self):
-        self.df.to_excel(self.filename, index=False, **self.kwargs)
+# class ExcelWriter:
+#     def __init__(self, df: pd.DataFrame, filename: str, log: bool = True, **kwargs):
+#         self.df = df
+#         self.filename = filename
+#         self.log = log
+#         self.start_time = None
+#         self.kwargs = kwargs
+#
+#     def __enter__(self):
+#         if self.log:
+#             logger.info(f"Начало записи: {self.filename}")
+#         os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+#         self.start_time = time.perf_counter()
+#         return self
+#
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         duration = time.perf_counter() - self.start_time
+#         if exc_type:
+#             logger.error(f"Ошибка при записи {self.filename}: {exc_val}")
+#         else:
+#             logger.info(
+#                 f"Файл записан: {self.filename} "
+#                 f"(строк: {len(self.df)}, время: {duration:.2f} сек)"
+#             )
+#         return False
+#
+#     def save(self):
+#         self.df.to_excel(self.filename, index=False, **self.kwargs)
 
 
 def load(df: pd.DataFrame, config: Dict) -> None:
@@ -113,7 +112,7 @@ def autoload_api_main(df: pd.DataFrame, config: Dict) -> None:
         access_token=token,
         upload_url=public_url,
         report_email=email,
-        schedule=None,
+        schedule=[],
         agreement=True,
         autoload_enabled=False,
     )
@@ -155,11 +154,12 @@ def update_avito_autoload_profile(
     access_token: str,
     upload_url: str,
     report_email: str,
-    schedule: list = None,
+    schedule: Optional[list[dict[str, Any]]] = None,
     agreement: bool = True,
     autoload_enabled: bool = True,
-):
+) -> requests.Response:
     """Функция обновления профиля автозагрузки в Авито"""
+
     if schedule is None:
         schedule = [{"rate": 100000, "time_slots": [9, 10], "weekdays": [0, 1, 2, 3, 4]}]
     url = "https://api.avito.ru/autoload/v1/profile"

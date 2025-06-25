@@ -2,7 +2,7 @@ import asyncio
 import logging
 import random
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Pattern, Tuple, Type
 
 import aiohttp
 import pandas as pd
@@ -80,11 +80,11 @@ async def validate_urls(df: pd.DataFrame) -> tuple[bool, List[str]]:
 
 
 # вспомогательные функции для этапа валидации обязательных колонок
-def is_missing(val) -> bool:
+def is_missing(val: Any) -> bool:
     return pd.isna(val) or str(val).strip() == ""
 
 
-def is_correct_type(val, expected_type) -> bool:
+def is_correct_type(val: Any | None, expected_type: Type | None) -> bool:
     if expected_type is None:
         return True
     if expected_type == int:
@@ -98,7 +98,7 @@ def is_correct_type(val, expected_type) -> bool:
     return False
 
 
-def is_allowed_value(val, allowed_values) -> bool:
+def is_allowed_value(val: Any | None, allowed_values: List[str | int] | None) -> bool:
     if allowed_values is None:
         return True
     try:
@@ -107,13 +107,13 @@ def is_allowed_value(val, allowed_values) -> bool:
         return False
 
 
-def matches_pattern(val, pattern) -> bool:
+def matches_pattern(val: Any | None, pattern: Pattern | None) -> bool:
     if pattern is None or not isinstance(val, str):
         return True
     return bool(pattern.match(val.strip()))
 
 
-def is_within_range(val, min_value, max_value) -> bool:
+def is_within_range(val: Any | None, min_value: int, max_value: int | None) -> bool:
     if isinstance(val, (int, float)):
         if min_value is not None and val < min_value:
             return False
@@ -127,8 +127,7 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     Функция валидации обязательных колонок:
     наличие, заполненность, допустимые значения, тип данных
     """
-
-    errors = []
+    errors: List[str] = []
 
     required_columns = [
         key for key, val in autoload_allowed_values.items() if val["required_parameter"]
@@ -142,10 +141,10 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
         return False, errors
 
     def check_row(row: pd.Series) -> Optional[str]:
-        row_errors = []
+        row_errors: List[str] = []
         for col in present_required:
             val = row[col]
-            rule = autoload_allowed_values[col]
+            rule: Dict[str, Any] = autoload_allowed_values[col]
 
             if is_missing(val):
                 row_errors.append(f"{col} — не заполнено")
@@ -157,8 +156,8 @@ def validate_required_fields(df: pd.DataFrame) -> Tuple[bool, List[str]]:
 
             if not is_within_range(val, rule.get("min_value"), rule.get("max_value")):
                 row_errors.append(
-                    f"{col} — выходит за допустимые пределы ("
-                    f"{rule.get('min_value')} - {rule.get('max_value')})"
+                    f"{col} — выходит за допустимые пределы "
+                    f"({rule.get('min_value')} - {rule.get('max_value')})"
                 )
 
             if rule.get("data_type") == str and not is_allowed_value(
