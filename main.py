@@ -1,6 +1,6 @@
 import logging
 import sys
-from collections.abc import Callable
+from typing import Any, Callable, Dict
 
 import pandas as pd
 import yaml
@@ -42,7 +42,7 @@ TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
 }
 
 
-def load_pipeline_config(config_path: str = "pipeline_config.yaml") -> dict:
+def load_pipeline_config(config_path: str = "pipeline_config.yaml") -> Any:
     """Функция загрузки конфигурации пайплайна из YAML-файла."""
     try:
         with open(config_path, "r", encoding="utf-8") as f:
@@ -55,7 +55,7 @@ def load_pipeline_config(config_path: str = "pipeline_config.yaml") -> dict:
         raise
 
 
-def transform_pipeline(df: pd.DataFrame, config: dict) -> pd.DataFrame:
+def transform_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
     """Функция трансформации согласно конфигурации."""
     transformations = config.get("transformations", [])
     for transform_name in transformations:
@@ -67,7 +67,7 @@ def transform_pipeline(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     return df
 
 
-def run_etl():
+def run_etl() -> None:
     """Функция запуска ETL-пайплайна."""
     config = load_config(REQUIRED_ENV_VARS, PATH_VARS)
     pipeline_config = load_pipeline_config()
@@ -98,7 +98,7 @@ def run_etl():
         raise
 
 
-def main():
+def main() -> None:
     try:
         run_etl()
     except (FileNotFoundError, ValueError) as e:

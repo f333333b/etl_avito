@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Dict
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 
@@ -21,16 +21,19 @@ PATH_VARS = [
 ]
 
 
-def load_config(required_vars: list[str], path_vars: list[str]) -> Dict[str, any]:
+def load_config(required_vars: list[str], path_vars: list[str]) -> Dict[str, Any]:
     """Функция загрузки и валидации конфигурации, включая переменные окружения и пути к файлам"""
 
     load_dotenv()
-    config = {}
-    missing_vars = []
+    config: Dict[str, Any] = {}
+    missing_vars: List[Any] = []
 
     for var in required_vars + path_vars:
         value = os.getenv(var)
-        (missing_vars if not value else config)[var] = value
+        if not value:
+            missing_vars.append(var)
+        else:
+            config[var] = value
 
     if missing_vars:
         error_msg = "Отсутствуют обязательные переменные окружения: " + ", ".join(missing_vars)

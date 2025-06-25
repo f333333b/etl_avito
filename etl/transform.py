@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
@@ -54,7 +54,7 @@ def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
     return df_sorted
 
 
-def normalize_addresses(raw_address: str, id: str) -> Optional[str]:
+def normalize_addresses(raw_address: str, id: str) -> Tuple[bool, str]:
     """Вспомогательная функция для нормализации написания адресов в колонке Address"""
 
     for city, full_address in city_to_full_address.items():
@@ -68,7 +68,7 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
 
     invalid_ids = []
 
-    def is_allowed(row):
+    def is_allowed(row: pd.Series) -> bool:
         brand = str(row["Make"]).strip()
         address = str(row["Address"]).strip()
         allowed_cities = dealerships.get(brand)
@@ -91,7 +91,7 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
-def fill_missing_cities(df: pd.DataFrame, dealerships: dict) -> pd.DataFrame:
+def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
     """Функция проверки размещения по всем городам согласно Title и Make"""
 
     id_counter = 1
@@ -154,7 +154,7 @@ def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
 
     original_len = len(df)
     normalized_addresses = []
-    error_messages = []
+    error_messages: List = []
 
     for _, row in df.iterrows():
         is_valid, result = normalize_addresses(row["Address"], row["AvitoId"])
@@ -238,7 +238,7 @@ def remove_duplicates_keep_latest(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def exceeds_length(val, max_length) -> bool:
+def exceeds_length(val: Any, max_length: int) -> bool:
     if max_length is None or not isinstance(val, str):
         return False
     return len(val) > max_length
