@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import random
@@ -7,7 +9,7 @@ from typing import Any, Dict, List, Optional, Pattern, Tuple, Type
 import aiohttp
 import pandas as pd
 
-from data.reference_data import autoload_allowed_values
+from etl.data.reference_data import autoload_allowed_values
 
 logger = logging.getLogger(__name__)
 

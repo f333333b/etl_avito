@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import re
 from datetime import datetime
@@ -5,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
-from data.reference_data import cities, city_to_full_address, dealerships
+from etl.data.reference_data import cities, city_to_full_address, dealerships
 
 logger = logging.getLogger(__name__)
 
