@@ -43,7 +43,7 @@ TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
 
 
 def load_pipeline_config(config_path: str = "pipeline_config.yaml") -> Any:
-    """Функция загрузки конфигурации пайплайна из YAML-файла."""
+    """Функция загрузки конфигурации пайплайна из YAML-файла"""
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
