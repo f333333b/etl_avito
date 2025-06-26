@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 from contextlib import contextmanager
@@ -8,7 +10,7 @@ import pandas as pd
 import requests
 import yadisk
 
-from utils import ensure_dir_created
+from etl.utils import ensure_dir_created
 
 logger = logging.getLogger(__name__)
 
