@@ -1,5 +1,6 @@
 # переменные окружения
 *.env
+!.env.example
 
 # python кэш
 __pycache__/
