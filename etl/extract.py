@@ -8,7 +8,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def read_excel_file(path: str) -> pd.DataFrame:
+def read_input_file(path: str) -> pd.DataFrame:
     """Функция чтения входных данных"""
 
     if not os.path.isfile(path):
