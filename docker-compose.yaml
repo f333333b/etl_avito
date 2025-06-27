@@ -29,7 +29,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./logs:/opt/airflow/logs
+      - airflow-logs:/opt/airflow/logs
       - ./etl/data:/opt/airflow/etl/data
     command: >
       bash -c "airflow db migrate &&
@@ -56,7 +56,7 @@ services:
     ports:
       - 8080:8080
     volumes:
-      - ./logs:/opt/airflow/logs
+      - airflow-logs:/opt/airflow/logs
       - ./etl/data:/opt/airflow/etl/data
     command: airflow webserver
 
@@ -78,7 +78,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./logs:/opt/airflow/logs
+      - airflow-logs:/opt/airflow/logs
       - ./etl/data:/opt/airflow/etl/data
     command: airflow scheduler
 
@@ -100,7 +100,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./logs:/opt/airflow/logs
+      - airflow-logs:/opt/airflow/logs
       - ./etl/data:/opt/airflow/etl/data
     command: airflow celery worker
 
