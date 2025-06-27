@@ -30,7 +30,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - ./etl/data:/opt/airflow/etl/data
+      - airflow-etl-data:/opt/airflow/etl/data
     command: >
       bash -c "airflow db migrate &&
                airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
@@ -57,7 +57,7 @@ services:
       - 8080:8080
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - ./etl/data:/opt/airflow/etl/data
+      - airflow-etl-data:/opt/airflow/etl/data
     command: airflow webserver
 
   scheduler:
@@ -79,7 +79,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - ./etl/data:/opt/airflow/etl/data
+      - airflow-etl-data:/opt/airflow/etl/data
     command: airflow scheduler
 
   worker:
@@ -101,9 +101,10 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - ./etl/data:/opt/airflow/etl/data
+      - airflow-etl-data:/opt/airflow/etl/data
     command: airflow celery worker
 
 volumes:
   postgres-db-volume:
   airflow-logs:
+  airflow-etl-data:
