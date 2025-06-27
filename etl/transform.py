@@ -16,7 +16,7 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     """Функция для удаления мусорных/пустых строк"""
 
     # стрип строковых ячеек
-    df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
     # удаление полностью пустых строк
     df_cleaned = df.dropna(how="all")
