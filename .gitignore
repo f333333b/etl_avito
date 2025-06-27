@@ -8,6 +8,8 @@ __pycache__/
 # виртуальные окружения
 .env/
 .venv/
+.venv310/
+venv310/
 venv/
 env/
 ENV/
