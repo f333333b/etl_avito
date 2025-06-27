@@ -7,16 +7,19 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-      - ./etl:/opt/airflow/etl
 
   redis:
     image: redis:latest
 
   airflow-init:
-    image: apache/airflow:2.8.1
+    build:
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       - postgres
       - redis
+    env_file:
+      - .env
     environment:
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -26,25 +29,20 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./etl:/opt/airflow/etl
-      - ./requirements.txt:/opt/airflow/requirements.txt
     command: >
-      bash -c "pip install -r /opt/airflow/requirements.txt &&
-               airflow db migrate &&
+      bash -c "airflow db migrate &&
                airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
 
   webserver:
-    image: apache/airflow:2.8.1
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: always
     depends_on:
       - airflow-init
     env_file:
       - .env
-    ports:
-      - 8080:8080
     environment:
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -53,18 +51,16 @@ services:
       AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    ports:
+      - 8080:8080
     volumes:
-      - ./data:/opt/airflow/data
-      - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./etl:/opt/airflow/etl
-      - ./requirements.txt:/opt/airflow/requirements.txt
-    command: >
-      bash -c "pip install -r /opt/airflow/requirements.txt && airflow webserver"
+    command: airflow webserver
 
   scheduler:
-    image: apache/airflow:2.8.1
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: always
     depends_on:
       - webserver
@@ -79,17 +75,13 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./data:/opt/airflow/data
-      - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./etl:/opt/airflow/etl
-      - ./requirements.txt:/opt/airflow/requirements.txt
-    command: >
-      bash -c "pip install -r /opt/airflow/requirements.txt && airflow scheduler"
+    command: airflow scheduler
 
   worker:
-    image: apache/airflow:2.8.1
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: always
     depends_on:
       - scheduler
@@ -104,19 +96,8 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./data:/opt/airflow/data
-      - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
-      - ./plugins:/opt/airflow/plugins
-      - ./etl:/opt/airflow/etl
-      - ./requirements.txt:/opt/airflow/requirements.txt
-    command: >
-      bash -c "pip install -r /opt/airflow/requirements.txt && airflow celery worker"
-
-  airflow:
-    build: .
-    env_file:
-      - .env
+    command: airflow celery worker
 
 volumes:
   postgres-db-volume:
