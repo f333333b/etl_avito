@@ -106,3 +106,4 @@ services:
 
 volumes:
   postgres-db-volume:
+  airflow-logs:
