@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
 import yaml
@@ -44,13 +45,14 @@ TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
 }
 
 
-def load_pipeline_config(config_path: str = "/opt/airflow/etl/pipeline_config.yaml") -> Any:
+def load_pipeline_config(config_path: Optional[str] = None) -> Any:
     """Функция загрузки конфигурации пайплайна из YAML-файла"""
+    path = config_path or os.environ.get("PIPELINE_CONFIG", "/opt/airflow/etl/pipeline_config.yaml")
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
     except FileNotFoundError as e:
-        logger.error(f"Конфигурационный YAML-файл не найден: {config_path}. Ошибка {e}")
+        logger.error(f"Конфигурационный YAML-файл не найден: {path}. Ошибка {e}")
         raise
     except yaml.YAMLError as e:
         logger.error(f"Ошибка парсинга YAML-файла: {e}")
