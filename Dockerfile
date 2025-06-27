@@ -4,7 +4,7 @@ USER root
 
 RUN mkdir -p /opt/airflow/etl/data \
     && chown -R airflow: /opt/airflow/etl/data
-    
+
 RUN mkdir -p /opt/airflow/logs \
     && chmod -R 777 /opt/airflow/logs
 
