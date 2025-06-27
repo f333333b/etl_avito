@@ -16,10 +16,7 @@ REQUIRED_ENV_VARS = [
     "API_FLAG",
 ]
 
-PATH_VARS = [
-    "INPUT_PATH",
-    "OUTPUT_PATH",
-]
+PATH_VARS = ["INPUT_PATH", "OUTPUT_PATH", "PIPELINE_CONFIG"]
 
 
 def load_config(required_vars: List[str], path_vars: List[str]) -> Dict[str, Any]:

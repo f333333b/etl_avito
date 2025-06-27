@@ -66,12 +66,16 @@ def load(df: pd.DataFrame, config: Dict) -> None:
 
 def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
     """Функция сохранения обработанного файла (Excel или CSV)"""
-
     df = df.copy()
     path = config["OUTPUT_PATH"]
     ext = os.path.splitext(path)[1].lower()
     folder = os.path.dirname(path)
     ensure_dir_created(folder)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    dir_name, file_name = os.path.split(path)
+    name, ext = os.path.splitext(file_name)
+    path = os.path.join(dir_name, f"{name}_{timestamp}{ext}")
 
     for col in df.select_dtypes(include=["datetimetz"]).columns:
         df[col] = df[col].dt.tz_localize(None)
@@ -86,17 +90,9 @@ def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
             raise ValueError(f"Неподдерживаемое расширение файла: {ext}")
 
         logger.info(f"Файл успешно сохранён: {path}")
-    except PermissionError:
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        dir_name, file_name = os.path.split(path)
-        name, ext = os.path.splitext(file_name)
-        path = os.path.join(dir_name, f"{name}_{timestamp}{ext}")
-        if ext == ".xlsx":
-            with excel_writer(path) as fname:
-                df.to_excel(fname, index=False)
-        elif ext == ".csv":
-            df.to_csv(path, index=False, encoding="utf-8-sig")
-        logger.warning(f"Основной файл занят. Сохранено как: {path}")
+    except PermissionError as e:
+        logger.error(f"Не удалось записать файл {path}: {e}")
+        raise
 
     file_size = os.path.getsize(path)
     logger.info(f"Размер файла: {file_size / (1024 ** 2):.2f} МБ. Количество строк: {len(df)}")
