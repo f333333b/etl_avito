@@ -18,6 +18,7 @@ ENV/
 .idea/
 
 # лог файлы и отладка
+logs/
 *.log
 
 # mypy, pytest, coverage
@@ -30,6 +31,9 @@ ENV/
 build/
 dist/
 *.egg-info/
+
+# output файлы
+etl/data/output*.xlsx
 
 *.tmp
 *.bak
