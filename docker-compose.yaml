@@ -1,0 +1,110 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+      - ./etl:/opt/airflow/etl
+
+  redis:
+    image: redis:latest
+
+  airflow-init:
+    image: apache/airflow:2.8.1
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./etl:/opt/airflow/etl
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    command: >
+      bash -c "pip install -r /opt/airflow/requirements.txt &&
+               airflow db migrate &&
+               airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
+
+  webserver:
+    image: apache/airflow:2.8.1
+    restart: always
+    depends_on:
+      - airflow-init
+    ports:
+      - 8080:8080
+    environment:
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./etl:/opt/airflow/etl
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    command: >
+      bash -c "pip install -r /opt/airflow/requirements.txt && airflow webserver"
+
+  scheduler:
+    image: apache/airflow:2.8.1
+    restart: always
+    depends_on:
+      - webserver
+    environment:
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./etl:/opt/airflow/etl
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    command: >
+      bash -c "pip install -r /opt/airflow/requirements.txt && airflow scheduler"
+
+  worker:
+    image: apache/airflow:2.8.1
+    restart: always
+    depends_on:
+      - scheduler
+    environment:
+      PYTHONPATH: /opt/airflow
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./etl:/opt/airflow/etl
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    command: >
+      bash -c "pip install -r /opt/airflow/requirements.txt && airflow celery worker"
+
+volumes:
+  postgres-db-volume:
