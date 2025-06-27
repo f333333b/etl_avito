@@ -29,7 +29,8 @@ build/
 dist/
 *.egg-info/
 
-# output файлы
+# файлы с данными
+*.parquet
 etl/data/output*.xlsx
 
 *.tmp
