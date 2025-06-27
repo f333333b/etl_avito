@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   postgres:
     image: postgres:13
@@ -43,6 +41,8 @@ services:
     restart: always
     depends_on:
       - airflow-init
+    env_file:
+      - .env
     ports:
       - 8080:8080
     environment:
@@ -54,6 +54,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
+      - ./data:/opt/airflow/data
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
@@ -67,6 +68,8 @@ services:
     restart: always
     depends_on:
       - webserver
+    env_file:
+      - .env
     environment:
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -76,6 +79,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
+      - ./data:/opt/airflow/data
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
@@ -89,6 +93,8 @@ services:
     restart: always
     depends_on:
       - scheduler
+    env_file:
+      - .env
     environment:
       PYTHONPATH: /opt/airflow
       AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -98,6 +104,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
+      - ./data:/opt/airflow/data
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
@@ -105,6 +112,11 @@ services:
       - ./requirements.txt:/opt/airflow/requirements.txt
     command: >
       bash -c "pip install -r /opt/airflow/requirements.txt && airflow celery worker"
+
+  airflow:
+    build: .
+    env_file:
+      - .env
 
 volumes:
   postgres-db-volume:

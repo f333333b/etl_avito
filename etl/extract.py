@@ -22,7 +22,7 @@ def read_excel_file(path: str) -> pd.DataFrame:
         if ext in [".xls", ".xlsx"]:
             df = pd.read_excel(path)
         elif ext == ".csv":
-            df = pd.read_csv(path)
+            df = pd.read_csv(path, encoding="utf-8")
         else:
             error_msg = f"Неподдерживаемый формат файла: {ext}"
             logger.error(error_msg)
