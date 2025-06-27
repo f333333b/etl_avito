@@ -10,7 +10,7 @@ import yaml
 
 from etl.config import PATH_VARS, REQUIRED_ENV_VARS, load_config
 from etl.data.reference_data import autoload_allowed_values, dealerships
-from etl.extract import read_excel_file
+from etl.extract import read_input_file
 from etl.load import load
 from etl.transform import (
     clean_raw_data,

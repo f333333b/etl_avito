@@ -1,7 +1,8 @@
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+import yaml
 from airflow.models import Variable
 from dotenv import load_dotenv
 
@@ -17,6 +18,20 @@ REQUIRED_ENV_VARS = [
 ]
 
 PATH_VARS = ["INPUT_PATH", "OUTPUT_PATH", "PIPELINE_CONFIG"]
+
+
+def load_pipeline_config(config_path: Optional[str] = None) -> Any:
+    """Функция загрузки конфигурации пайплайна из YAML-файла"""
+    path = config_path or os.environ.get("PIPELINE_CONFIG", "/opt/airflow/etl/pipeline_config.yaml")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError as e:
+        logger.error(f"Конфигурационный YAML-файл не найден: {path}. Ошибка {e}")
+        raise
+    except yaml.YAMLError as e:
+        logger.error(f"Ошибка парсинга YAML-файла: {e}")
+        raise
 
 
 def load_config(required_vars: List[str], path_vars: List[str]) -> Dict[str, Any]:

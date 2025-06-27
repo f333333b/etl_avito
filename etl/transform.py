@@ -7,10 +7,9 @@ from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
-from etl.data.reference_data import cities, city_to_full_address, dealerships
+from etl.data.reference_data import cities, city_to_full_address, dealerships, autoload_allowed_values
 
 logger = logging.getLogger(__name__)
-
 
 def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     """Функция для удаления мусорных/пустых строк"""
@@ -244,3 +243,24 @@ def exceeds_length(val: Any, max_length: int) -> bool:
     if max_length is None or not isinstance(val, str):
         return False
     return len(val) > max_length
+
+TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
+    "clean_raw_data": clean_raw_data,
+    "convert_data_types": lambda df: convert_data_types(df, autoload_allowed_values),
+    "normalize_columns_to_constants": normalize_columns_to_constants,
+    "normalize_addresses_column": normalize_addresses_column,
+    "remove_invalid_dealerships": remove_invalid_dealerships,
+    "remove_duplicates_keep_latest": remove_duplicates_keep_latest,
+    "normalize_group_by_latest": normalize_group_by_latest,
+    "fill_missing_cities": lambda df: fill_missing_cities(df, dealerships),
+}
+
+def transform_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
+    """Функция трансформации согласно конфигурации"""
+    transformations = config.get("transformations", [])
+    for transform_name in transformations:
+        if transform_name not in TRANSFORM_FUNCTIONS:
+            logger.error(f"Неизвестная трансформация: {transform_name}")
+            raise ValueError(f"Неизвестная трансформация: {transform_name}")
+        df = TRANSFORM_FUNCTIONS[transform_name](df)
+    return df

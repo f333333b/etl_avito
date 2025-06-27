@@ -15,7 +15,8 @@ services:
     image: apache/airflow:2.8.1
     user: root
     volumes:
-      - airflow-etl-data:/opt/airflow/etl/data
+      - airflow-etl-data:/opt/airflow/etl/datalsl
+      - ./etl/data:/opt/airflow/etl/data
     command: >
       bash -c "chmod -R 775 /opt/airflow/etl/data &&
                chown -R 50000:0 /opt/airflow/etl/data"
@@ -41,6 +42,7 @@ services:
     volumes:
       - airflow-logs:/opt/airflow/logs
       - airflow-etl-data:/opt/airflow/etl/data
+      - ./etl/data:/opt/airflow/etl/data
     command: >
       bash -c "airflow db migrate &&
                airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
@@ -68,6 +70,7 @@ services:
     volumes:
       - airflow-logs:/opt/airflow/logs
       - airflow-etl-data:/opt/airflow/etl/data
+      - ./etl/data:/opt/airflow/etl/data
     command: airflow webserver
 
   scheduler:
@@ -90,6 +93,7 @@ services:
     volumes:
       - airflow-logs:/opt/airflow/logs
       - airflow-etl-data:/opt/airflow/etl/data
+      - ./etl/data:/opt/airflow/etl/data
     command: airflow scheduler
 
   worker:
@@ -112,6 +116,7 @@ services:
     volumes:
       - airflow-logs:/opt/airflow/logs
       - airflow-etl-data:/opt/airflow/etl/data
+      - ./etl/data:/opt/airflow/etl/data
     command: airflow celery worker
 
 volumes:
