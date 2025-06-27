@@ -6,13 +6,10 @@ __pycache__/
 *.py[cod]
 
 # виртуальные окружения
-.env/
-.venv/
-.venv310/
-venv310/
-venv/
-env/
-ENV/
+**/venv*/
+**/.venv*/
+**/env*/
+**/ENV*/
 
 # IDE (PyCharm)
 .idea/
@@ -24,7 +21,7 @@ logs/
 # mypy, pytest, coverage
 .mypy_cache/
 .pytest_cache/
-.cache
+.cache/
 .coverage
 
 # файлы pip и build
