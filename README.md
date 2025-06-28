@@ -190,6 +190,32 @@ Airflow UI доступен по адресу:
 
 Запустите DAG `etl_avito_dag`
 
+<details>
+<summary><strong>Скриншоты</strong></summary>
+
+<details>
+<summary>Airflow DAG UI</summary>
+
+![Airflow DAG UI](docs/images/dag_ui.png)
+
+</details>
+
+<details>
+<summary>Graph view</summary>
+
+![Graph view](docs/images/graph_view.png)
+
+</details>
+
+<details>
+<summary>Образец входных данных</summary>
+
+![Образец входных данных](docs/images/input_data_preview.png)
+
+</details>
+
+</details>
+
 ## Использование в Airflow
 
 - DAG называется `etl_avito_dag`.
