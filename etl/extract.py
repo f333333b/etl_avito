@@ -27,32 +27,31 @@ def read_input_file(path: str) -> pd.DataFrame:
             error_msg = f"Неподдерживаемый формат файла: {ext}"
             logger.error(error_msg)
             raise ValueError(error_msg)
-
-        logger.info(f"Файл успешно прочитан: {path}")
-        logger.info(f"Размер файла: {file_size / (1024 ** 2):.2f} МБ. Количество строк: {len(df)}")
-
-        required_columns = [
-            "Id",
-            "Address",
-            "Category",
-            "Title",
-            "Description",
-            "VehicleType",
-            "Make",
-            "Model",
-            "Type",
-            "Year",
-            "Availability",
-            "Condition",
-        ]
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            error_msg = f"Отсутствуют обязательные колонки: {', '.join(missing_columns)}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        return df
-
     except Exception as e:
         logger.exception(f"Ошибка при чтении файла {path}: {e}")
         raise
+
+    logger.info(f"Файл успешно прочитан: {path}")
+    logger.info(f"Размер файла: {file_size / (1024 ** 2):.2f} МБ. Количество строк: {len(df)}")
+
+    required_columns = [
+        "Id",
+        "Address",
+        "Category",
+        "Title",
+        "Description",
+        "VehicleType",
+        "Make",
+        "Model",
+        "Type",
+        "Year",
+        "Availability",
+        "Condition",
+    ]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        error_msg = f"Отсутствуют обязательные колонки: {', '.join(missing_columns)}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    return df
