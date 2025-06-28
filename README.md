@@ -244,7 +244,7 @@ docker-compose run webserver airflow dags trigger etl_avito_dag
 
 ### Utility
 
-- Unit-тесты
+- Unit-тесты (для validation.py в первую очередь)
 - CI/CD
 - HTML-отчёт о результатах работы DAG, отправка по почте и в Telegram
 - Метрики производительности обработки нескольких файлов по ~50 000 строк

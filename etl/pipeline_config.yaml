@@ -1,8 +1,24 @@
+# Список функций, которые будут вызваны во время transform-этапа ETL
+
+
 transformations:
+  # удаление мусорных/пустых строк
   - clean_raw_data
+
+  # удаление строк, нарушающих дилерство по брендам и городам
   - remove_invalid_dealerships
+
+  # проверка размещения по всем городам согласно Title и Make
   - fill_missing_cities
+
+  # нормализации (приведение к единым значениям)
   - normalize_columns_to_constants
+
+  # приведение типов данных колонок из справочника
   - convert_data_types
+
+  # нормализация строк, сгруппированных по Title
   - normalize_group_by_latest
+
+  # нормализация адресов + удаление ненормализованных
   - normalize_addresses_column
