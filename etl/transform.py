@@ -8,9 +8,11 @@ from typing import Any, Dict, List, Tuple
 import pandas as pd
 
 from etl.data.reference_data import cities, city_to_full_address, dealerships, autoload_allowed_values
+from etl.utils import safe_transform
 
 logger = logging.getLogger(__name__)
 
+@safe_transform
 def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     """Функция для удаления мусорных/пустых строк"""
 
@@ -29,12 +31,11 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_cleaned
 
-
+@safe_transform
 def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
     """Функция для нормализации строк, сгруппированных по Title"""
 
     # logger.info(f"Перед нормализацией по Title: {df.shape[0]} строк")
-
     df["AvitoDateEnd"] = df["AvitoDateEnd"].astype(str)
     df["AvitoDateEnd"] = pd.to_datetime(df["AvitoDateEnd"], errors="coerce")
     df["StatusPriority"] = df["AvitoStatus"].apply(lambda x: 1 if x == "Активно" else 0)
@@ -58,12 +59,16 @@ def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
 def normalize_addresses(raw_address: str, id: str) -> Tuple[bool, str]:
     """Вспомогательная функция для нормализации написания адресов в колонке Address"""
 
+    if not isinstance(raw_address, str):
+        return False, f"AvitoId: {id}, адрес отсутствует или некорректен"
+
     for city, full_address in city_to_full_address.items():
         if re.search(rf"\b{re.escape(city)}\b", raw_address, re.IGNORECASE):
             return True, full_address
+
     return False, f"AvitoId: {id}, адрес: {raw_address}"
 
-
+@safe_transform
 def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
     """Функция удаления строк, нарушающих дилерство по брендам и городам"""
 
@@ -91,7 +96,7 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Нарушений дилерства не обнаружено")
     return result_df
 
-
+@safe_transform
 def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
     """Функция проверки размещения по всем городам согласно Title и Make"""
 
@@ -133,7 +138,7 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
     # logger.info(f"Размер итогового DataFrame: {df.shape}")
     return df
 
-
+@safe_transform
 def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
     """Функция нормализации (приведение к единым значениям)"""
 
@@ -149,7 +154,7 @@ def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
         df.loc[df["DisplayAreas"] != "", "DisplayAreas"] = ""
     return df
 
-
+@safe_transform
 def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
     """Функция нормализации адресов + удаление ненормализованных"""
 
@@ -182,7 +187,7 @@ def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
     df.drop(columns="address_error", inplace=True)
     return df
 
-
+@safe_transform
 def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.DataFrame:
     """Функция приведения типов данных колонок из справочника"""
     df = df.copy()
@@ -194,31 +199,26 @@ def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.Da
             continue
 
         target_type = props.get("data_type")
-        try:
-            if target_type is str:
-                max_length = props.get("max_length")
-                if column == "ContactPhone":
-                    df[column] = df[column].apply(lambda x: str(int(x)) if pd.notna(x) else "")
-                else:
-                    df[column] = df[column].astype(str).fillna("")
-                if max_length:
-                    original_lengths = df[column].str.len()
-                    df[column] = df[column].str.slice(0, max_length)
-                    trimmed = (original_lengths > max_length).sum()
-                    total_trimmed_rows += trimmed
-            elif target_type is int:
-                df[column] = pd.to_numeric(df[column], errors="coerce")
-                df[column] = df[column].astype("Int64")
-            elif target_type is float:
-                df[column] = pd.to_numeric(df[column], errors="coerce")
-            elif target_type is datetime:
-                df[column] = pd.to_datetime(df[column], errors="coerce")
+        if target_type is str:
+            max_length = props.get("max_length")
+            if column == "ContactPhone":
+                df[column] = df[column].apply(lambda x: str(int(x)) if pd.notna(x) else "")
             else:
-                raise ValueError(f"Неизвестный тип {target_type} для колонки {column}")
-        except Exception as e:
-            error_msg = f"Ошибка при приведении {column} к {target_type}: {e}"
-            logger.error(error_msg)
-            errors.append(error_msg)
+                df[column] = df[column].astype(str).fillna("")
+            if max_length:
+                original_lengths = df[column].str.len()
+                df[column] = df[column].str.slice(0, max_length)
+                trimmed = (original_lengths > max_length).sum()
+                total_trimmed_rows += trimmed
+        elif target_type is int:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+            df[column] = df[column].astype("Int64")
+        elif target_type is float:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+        elif target_type is datetime:
+            df[column] = pd.to_datetime(df[column], errors="coerce")
+        else:
+            raise ValueError(f"Неизвестный тип {target_type} для колонки {column}")
 
     if total_trimmed_rows > 0:
         logger.info(f"Всего обрезано строк по длине: {total_trimmed_rows} шт.")
@@ -227,7 +227,7 @@ def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.Da
 
     return df
 
-
+@safe_transform
 def remove_duplicates_keep_latest(df: pd.DataFrame) -> pd.DataFrame:
     """Функция удаления дубликатов"""
     df = df.copy()
@@ -244,15 +244,21 @@ def exceeds_length(val: Any, max_length: int) -> bool:
         return False
     return len(val) > max_length
 
+def safe_convert_data_types(df: pd.DataFrame) -> pd.DataFrame:
+    return convert_data_types(df, autoload_allowed_values)
+
+def safe_fill_missing_cities(df: pd.DataFrame) -> pd.DataFrame:
+    return fill_missing_cities(df, dealerships)
+
 TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "clean_raw_data": clean_raw_data,
-    "convert_data_types": lambda df: convert_data_types(df, autoload_allowed_values),
+    "convert_data_types": safe_convert_data_types,
     "normalize_columns_to_constants": normalize_columns_to_constants,
     "normalize_addresses_column": normalize_addresses_column,
     "remove_invalid_dealerships": remove_invalid_dealerships,
     "remove_duplicates_keep_latest": remove_duplicates_keep_latest,
     "normalize_group_by_latest": normalize_group_by_latest,
-    "fill_missing_cities": lambda df: fill_missing_cities(df, dealerships),
+    "fill_missing_cities": safe_fill_missing_cities,
 }
 
 def transform_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
@@ -262,5 +268,9 @@ def transform_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame
         if transform_name not in TRANSFORM_FUNCTIONS:
             logger.error(f"Неизвестная трансформация: {transform_name}")
             raise ValueError(f"Неизвестная трансформация: {transform_name}")
-        df = TRANSFORM_FUNCTIONS[transform_name](df)
+        try:
+            df = TRANSFORM_FUNCTIONS[transform_name](df)
+        except Exception as e:
+            logger.error(f"Ошибка в трансформации {transform_name}: {e}")
+            raise
     return df
