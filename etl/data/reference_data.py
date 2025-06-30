@@ -72,6 +72,7 @@ branch_city_to_full_address = {
     "Челябинск": "Челябинская обл., Челябинск, Троицкий тракт",
 }
 
+
 autoload_allowed_values = {
     "Id": {
         "allowed_values": None,

@@ -2,56 +2,64 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 import pandas as pd
+
+from etl.data.reference_data import autoload_allowed_values
 
 logger = logging.getLogger(__name__)
 
 
-def read_input_file(path: str) -> pd.DataFrame:
+def extract_files(path: str, is_single_path: bool) -> pd.DataFrame:
+    """Функция запуска чтения файла/файлов"""
+    if is_single_path:
+        extension = os.path.splitext(path)[1].lower()
+        result = read_input_file(path, extension)
+    else:
+        dfs = []
+        for file_name in Path(path).rglob("*"):
+            if file_name.suffix.lower() in [".csv", ".xls", ".xlsx"]:
+                extension = file_name.suffix.lower()
+                df = read_input_file(str(file_name), extension)
+                dfs.append(df)
+        result = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+    logger.info(f"Общее количество строк: {len(result)}")
+    return result
+
+
+def read_input_file(file_path: str, extension: str) -> pd.DataFrame:
     """Функция чтения входных данных"""
 
-    if not os.path.isfile(path):
-        logger.error(f"Файл не найден: {path}")
-        raise FileNotFoundError(f"Файл не найден: {path}")
-
-    file_size = os.path.getsize(path)
-    ext = os.path.splitext(path)[1].lower()
-
     try:
-        if ext in [".xls", ".xlsx"]:
-            df = pd.read_excel(path)
-        elif ext == ".csv":
-            df = pd.read_csv(path, encoding="utf-8")
+        if extension in [".xls", ".xlsx"]:
+            df = pd.read_excel(file_path)
+        elif extension == ".csv":
+            df = pd.read_csv(file_path, encoding="utf-8")
         else:
-            error_msg = f"Неподдерживаемый формат файла: {ext}"
+            error_msg = f"Неподдерживаемый формат файла: {extension}"
             logger.error(error_msg)
             raise ValueError(error_msg)
     except Exception as e:
-        logger.exception(f"Ошибка при чтении файла {path}: {e}")
+        logger.exception(f"Ошибка при чтении файла {file_path}: {e}")
         raise
 
-    logger.info(f"Файл успешно прочитан: {path}")
-    logger.info(f"Размер файла: {file_size / (1024 ** 2):.2f} МБ. Количество строк: {len(df)}")
+    file_size = os.path.getsize(file_path) / (1024 * 1024)
+    logger.info(f"Файл успешно прочитан: {file_path}")
+    logger.info(f"Размер файла: {file_size:.2f} MB")
 
     required_columns = [
-        "Id",
-        "Address",
-        "Category",
-        "Title",
-        "Description",
-        "VehicleType",
-        "Make",
-        "Model",
-        "Type",
-        "Year",
-        "Availability",
-        "Condition",
+        key for key, value in autoload_allowed_values.items() if value["required_parameter"]
     ]
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        error_msg = f"Отсутствуют обязательные колонки: {', '.join(missing_columns)}"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
+
+    if df.empty:
+        logger.warning(f"Файл пустой: {file_path}. Размер файла: {file_size:.2f} MB")
+    else:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            error_msg = f"Отсутствуют обязательные колонки: {', '.join(missing_columns)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
     return df

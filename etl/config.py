@@ -15,6 +15,7 @@ REQUIRED_ENV_VARS = [
     "EMAIL",
     "USER_ID",
     "API_FLAG",
+    "IS_SINGLE_FILE",
 ]
 
 PATH_VARS = ["INPUT_PATH", "OUTPUT_PATH", "PIPELINE_CONFIG"]
@@ -53,10 +54,22 @@ def load_config(required_vars: List[str], path_vars: List[str]) -> Dict[str, Any
         logger.error(error_msg)
         raise EnvironmentError(error_msg)
 
-    if "INPUT_PATH" in config and not os.path.isfile(config["INPUT_PATH"]):
-        error_msg = f"Входной файл не существует: {config['INPUT_PATH']}"
-        logger.error(error_msg)
-        raise FileNotFoundError(error_msg)
+    if "IS_SINGLE_FILE" in config:
+        config["IS_SINGLE_FILE"] = str(config["IS_SINGLE_FILE"]).strip().lower() == "true"
+
+    if "INPUT_PATH" in config:
+        path = config["INPUT_PATH"]
+
+        if config.get("IS_SINGLE_FILE", False):
+            if not os.path.isfile(path):
+                error_msg = f"Входной файл не существует: {path}"
+                logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
+        else:
+            if not os.path.isdir(path):
+                error_msg = f"Входная директория не существует: {path}"
+                logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
 
     if "OUTPUT_PATH" in config:
         output_dir = os.path.dirname(config["OUTPUT_PATH"])
