@@ -3,14 +3,20 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import pandas as pd
 
-from etl.data.reference_data import cities, city_to_full_address, dealerships, autoload_allowed_values
+from etl.data.reference_data import (
+    all_branch_cities,
+    autoload_allowed_values,
+    branch_city_to_full_address,
+    dealerships,
+)
 from etl.utils import safe_transform
 
 logger = logging.getLogger(__name__)
+
 
 @safe_transform
 def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -22,14 +28,16 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     # удаление полностью пустых строк
     df_cleaned = df.dropna(how="all")
 
-    # удаление дублей по колонкам
-    df_cleaned = df_cleaned.drop_duplicates(subset=["AvitoId", "Id"])
+    # удаление дублей по колонкам AvitoId или Id
+    df_cleaned = df_cleaned.drop_duplicates(subset=["AvitoId"], keep="first")
+    df_cleaned = df_cleaned.drop_duplicates(subset=["Id"], keep="first")
 
     # подсчет количества удаленных строк
     removed = len(df) - len(df_cleaned)
     logger.info(f"Удалено мусорных/пустых строк: {removed} шт.")
 
     return df_cleaned
+
 
 @safe_transform
 def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
@@ -55,18 +63,6 @@ def normalize_group_by_latest(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_sorted
 
-
-def normalize_addresses(raw_address: str, id: str) -> Tuple[bool, str]:
-    """Вспомогательная функция для нормализации написания адресов в колонке Address"""
-
-    if not isinstance(raw_address, str):
-        return False, f"AvitoId: {id}, адрес отсутствует или некорректен"
-
-    for city, full_address in city_to_full_address.items():
-        if re.search(rf"\b{re.escape(city)}\b", raw_address, re.IGNORECASE):
-            return True, full_address
-
-    return False, f"AvitoId: {id}, адрес: {raw_address}"
 
 @safe_transform
 def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
@@ -96,6 +92,7 @@ def remove_invalid_dealerships(df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Нарушений дилерства не обнаружено")
     return result_df
 
+
 @safe_transform
 def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
     """Функция проверки размещения по всем городам согласно Title и Make"""
@@ -103,7 +100,7 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
     id_counter = 1
     new_rows = []
     for (title, make), group in df.groupby(["Title", "Make"]):
-        allowed_cities = dealerships.get(make, cities)
+        allowed_cities = dealerships.get(make, all_branch_cities)
         existing_cities = set()
         for _, row in group.iterrows():
             if str(row["AvitoStatus"]).strip().lower() != "активно":
@@ -118,7 +115,7 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
             template_row = group.iloc[0].copy()
             for city in sorted(missing_cities):
                 new_row = template_row.copy()
-                new_row["Address"] = f"{city}"
+                new_row["Address"] = city
                 new_row["AvitoId"] = ""
                 new_row["AvitoDateEnd"] = ""
                 new_row["AvitoStatus"] = "Активно"
@@ -128,7 +125,6 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
             # logger.info(f"Объявление '{title}': добавлено строк: {len(missing_cities)} шт.")
     if new_rows:
         df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
-        # отнимаем 1 - строку с названиями колонок
         logger.info(
             f"Проверка на размещение по городам. Добавлено новых строк: {len(new_rows)} шт."
         )
@@ -137,6 +133,7 @@ def fill_missing_cities(df: pd.DataFrame, dealerships: Dict) -> pd.DataFrame:
     # logger.info(df.tail(5))
     # logger.info(f"Размер итогового DataFrame: {df.shape}")
     return df
+
 
 @safe_transform
 def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
@@ -154,12 +151,29 @@ def normalize_columns_to_constants(df: pd.DataFrame) -> pd.DataFrame:
         df.loc[df["DisplayAreas"] != "", "DisplayAreas"] = ""
     return df
 
+
+def normalize_addresses(raw_address: str, id: str) -> Tuple[bool, str]:
+    """Вспомогательная функция для нормализации написания адресов в колонке Address"""
+
+    if not isinstance(raw_address, str):
+        return (
+            False,
+            f"Некорректный адрес для AvitoId {id}: адрес отсутствует или не является строкой.",
+        )
+
+    for city, full_address in branch_city_to_full_address.items():
+        if re.search(rf"\b{re.escape(city)}\b", raw_address, re.IGNORECASE):
+            return True, full_address
+
+    return False, f"AvitoId: {id}, адрес: {raw_address}"
+
+
 @safe_transform
 def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
     """Функция нормализации адресов + удаление ненормализованных"""
 
     original_len = len(df)
-    normalized_addresses = []
+    normalized_addresses: List = []
     error_messages: List = []
 
     for _, row in df.iterrows():
@@ -187,12 +201,23 @@ def normalize_addresses_column(df: pd.DataFrame) -> pd.DataFrame:
     df.drop(columns="address_error", inplace=True)
     return df
 
+
 @safe_transform
 def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.DataFrame:
     """Функция приведения типов данных колонок из справочника"""
     df = df.copy()
     errors = []
     total_trimmed_rows = 0
+
+    def safe_int_to_str(x):
+        """Вспомогательная функция приведения строковых значений к числовым"""
+        if pd.isna(x):
+            return ""
+        try:
+            return str(int(x))
+        except ValueError:
+            logger.error(f"Ошибка приведения к int: значение '{x}'")
+            return ""
 
     for column, props in autoload_allowed_values.items():
         if column not in df.columns:
@@ -202,7 +227,7 @@ def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.Da
         if target_type is str:
             max_length = props.get("max_length")
             if column == "ContactPhone":
-                df[column] = df[column].apply(lambda x: str(int(x)) if pd.notna(x) else "")
+                df[column] = df[column].apply(safe_int_to_str)
             else:
                 df[column] = df[column].astype(str).fillna("")
             if max_length:
@@ -212,7 +237,8 @@ def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.Da
                 total_trimmed_rows += trimmed
         elif target_type is int:
             df[column] = pd.to_numeric(df[column], errors="coerce")
-            df[column] = df[column].astype("Int64")
+            df[column] = df[column].round(0)
+            df[column] = df[column].fillna(pd.NA).astype("Int64")
         elif target_type is float:
             df[column] = pd.to_numeric(df[column], errors="coerce")
         elif target_type is datetime:
@@ -226,6 +252,7 @@ def convert_data_types(df: pd.DataFrame, autoload_allowed_values: dict) -> pd.Da
         logger.info(f"Обнаружено {len(errors)} ошибок при приведении типов")
 
     return df
+
 
 @safe_transform
 def remove_duplicates_keep_latest(df: pd.DataFrame) -> pd.DataFrame:
@@ -244,11 +271,14 @@ def exceeds_length(val: Any, max_length: int) -> bool:
         return False
     return len(val) > max_length
 
+
 def safe_convert_data_types(df: pd.DataFrame) -> pd.DataFrame:
     return convert_data_types(df, autoload_allowed_values)
 
+
 def safe_fill_missing_cities(df: pd.DataFrame) -> pd.DataFrame:
     return fill_missing_cities(df, dealerships)
+
 
 TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "clean_raw_data": clean_raw_data,
@@ -260,6 +290,7 @@ TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "normalize_group_by_latest": normalize_group_by_latest,
     "fill_missing_cities": safe_fill_missing_cities,
 }
+
 
 def transform_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
     """Функция трансформации согласно конфигурации"""
