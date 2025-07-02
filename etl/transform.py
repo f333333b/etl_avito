@@ -291,7 +291,6 @@ TRANSFORM_FUNCTIONS: dict[str, Callable[[pd.DataFrame], pd.DataFrame]] = {
     "fill_missing_cities": safe_fill_missing_cities,
 }
 
-
 def transform_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
     """Функция трансформации согласно конфигурации"""
     transformations = config.get("transformations", [])

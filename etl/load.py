@@ -62,6 +62,7 @@ def load(df: pd.DataFrame, config: Dict) -> None:
         autoload_api_main(df, config)
     else:
         save_dataframe(df, config)
+    to_db(df)
 
 
 def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
@@ -178,3 +179,14 @@ def update_avito_autoload_profile(
     else:
         logger.error(f"Ошибка при обновлении профиля: {response.status_code}, {response.text}")
     return response
+
+def to_db(df: pd.DataFrame) -> None:
+    """Функция создания реляционной БД из DataFrame"""
+
+    engine = create_engine("postgresql+psycopg2://airflow:airflow@postgres/airflow")
+    df.to_sql(
+        name="avito_table",
+        con=engine,
+        if_exists="replace",
+        index=False
+    )
