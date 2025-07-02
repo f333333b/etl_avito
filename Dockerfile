@@ -10,6 +10,7 @@ RUN mkdir -p /opt/airflow/logs \
 
 USER airflow
 
+COPY .env.example .env
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt

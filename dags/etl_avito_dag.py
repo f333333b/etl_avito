@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta
 
+import glob
 import pandas as pd
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -12,7 +13,7 @@ from etl.load import load
 from etl.transform import transform_pipeline
 from etl.validation import validate_data
 
-DATA_PATH = "/opt/airflow/etl/data/avito_data.parquet"
+DATA_PATH = "/opt/airflow/etl/data/"
 
 logger = LoggingMixin().log
 
@@ -21,33 +22,69 @@ def extract() -> None:
     """Функция извлечения данных"""
     config = load_config(REQUIRED_ENV_VARS, PATH_VARS)
     logger.info("=== EXTRACT ===")
-    df = extract_files(config["INPUT_PATH"], config["IS_SINGLE_FILE"])
-    df.to_parquet(DATA_PATH, index=False)
+
+    extracted = extract_files(config["INPUT_PATH"])
+
+    if not extracted:
+        logger.warning("EXTRACT завершён: файлов для обработки не найдено.")
+        return
+
+    os.makedirs(DATA_PATH, exist_ok=True)
+
+    for i, (file_name, df) in enumerate(extracted, start=1):
+        parquet_name = f"avito_data_{file_name}.parquet"
+        output_path = os.path.join(DATA_PATH, parquet_name)
+
+        df.to_parquet(output_path, index=False)
+        logger.info(f"[{i}] Файл сохранен: {output_path}, строк: {len(df)}")
 
 
 def transform() -> None:
     """Функция трансформации данных"""
+
     logger.info("=== TRANSFORM ===")
     pipeline_config = load_pipeline_config()
-    df = pd.read_parquet(DATA_PATH)
-    df = transform_pipeline(df, pipeline_config)
-    df.to_parquet(DATA_PATH, index=False)
+    parquet_files = glob.glob(os.path.join(DATA_PATH, "avito_data_account_*.parquet"))
+    for parquet_file in parquet_files:
+        logger.info(f"Трансформация стартует для файла: {parquet_file}")
+
+        df = pd.read_parquet(parquet_file)
+        df = transform_pipeline(df, pipeline_config)
+        df.to_parquet(parquet_file, index=False)
+
+        logger.info(f"Трансформация завершена для файла: {parquet_file}")
 
 
 def validate() -> None:
     """Функция валидации данных"""
     logger.info("=== VALIDATION ===")
-    df = pd.read_parquet(DATA_PATH)
-    validate_data(df)
+
+    parquet_files = glob.glob(os.path.join(DATA_PATH, "avito_data_account_*.parquet"))
+
+    for parquet_file in parquet_files:
+        logger.info(f"Валидация стартует для файла: {parquet_file}")
+
+        df = pd.read_parquet(parquet_file)
+        validate_data(df)
+
+        logger.info(f"Валидация завершена для файла: {parquet_file}")
 
 
 def load_data() -> None:
     """Функция выгрузки обработанных данных"""
+
     logger.info("=== LOAD ===")
     config = load_config(REQUIRED_ENV_VARS, PATH_VARS)
-    df = pd.read_parquet(DATA_PATH)
-    load(df, config)
-    os.remove(DATA_PATH)
+    parquet_files = glob.glob(os.path.join(DATA_PATH, "avito_data_account_*.parquet"))
+
+    for parquet_file in parquet_files:
+        logger.info(f"Загрузка стартует для файла: {parquet_file}")
+
+        df = pd.read_parquet(parquet_file)
+        load(df, config)
+
+        os.remove(parquet_file)
+        logger.info(f"Загрузка завершена для файла: {parquet_file}")
 
 
 default_args = {

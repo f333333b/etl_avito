@@ -11,22 +11,18 @@ from etl.data.reference_data import autoload_allowed_values
 logger = logging.getLogger(__name__)
 
 
-def extract_files(path: str, is_single_path: bool) -> pd.DataFrame:
+def extract_files(path: str) -> list[tuple[str, pd.DataFrame]]:
     """Функция запуска чтения файла/файлов"""
-    if is_single_path:
-        extension = os.path.splitext(path)[1].lower()
-        result = read_input_file(path, extension)
-    else:
-        dfs = []
-        for file_name in Path(path).rglob("*"):
-            if file_name.suffix.lower() in [".csv", ".xls", ".xlsx"]:
-                extension = file_name.suffix.lower()
-                df = read_input_file(str(file_name), extension)
-                dfs.append(df)
-        result = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
-    logger.info(f"Общее количество строк: {len(result)}")
-    return result
+    dfs = []
+    for file_path in Path(path).rglob("*"):
+        if file_path.suffix.lower() in [".csv", ".xls", ".xlsx"]:
+            extension = file_path.suffix.lower()
+            df = read_input_file(str(file_path), extension)
+            file_name = file_path.name
+            df["source_file"] = file_name
+            dfs.append((file_name, df))
+    return dfs
 
 
 def read_input_file(file_path: str, extension: str) -> pd.DataFrame:
