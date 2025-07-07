@@ -17,6 +17,8 @@ def extract_files(path: str) -> list[tuple[str, pd.DataFrame]]:
     dfs = []
     for file_path in Path(path).rglob("*"):
         if file_path.suffix.lower() in [".csv", ".xls", ".xlsx"]:
+            if file_path.name.lower().startswith("output"):
+                continue
             extension = file_path.suffix.lower()
             df = read_input_file(str(file_path), extension)
             file_name = file_path.name
@@ -65,7 +67,7 @@ def read_input_file(file_path: str, extension: str) -> pd.DataFrame:
 def clean_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
     """Вспомогательная функция очистки DataFrame для совместимости с Parquet"""
     df = df.copy()
-    for col in df.select_dtypes(include=['object']).columns:
+    for col in df.select_dtypes(include=["object"]).columns:
         df[col] = df[col].astype(str)
-    df = df.fillna('')
+    df = df.fillna("")
     return df

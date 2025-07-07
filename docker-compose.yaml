@@ -11,6 +11,27 @@ services:
     ports:
       - "5432:5432"
 
+  clickhouse:
+    image: yandex/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    command: >
+      bash -c "
+      echo '<clickhouse><listen_host>0.0.0.0</listen_host></clickhouse>' > /etc/clickhouse-server/config.d/listen.xml &&
+      /entrypoint.sh
+      "
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
   redis:
     image: redis:latest
 
@@ -126,3 +147,4 @@ services:
 volumes:
   postgres-db-volume:
   airflow-logs:
+  clickhouse_data:

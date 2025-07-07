@@ -6,10 +6,10 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+import clickhouse_connect
 import pandas as pd
 import requests
 import yadisk
-from sqlalchemy import create_engine
 
 from etl.utils import ensure_dir_created
 
@@ -71,10 +71,10 @@ def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
     df = df.copy()
     path = config["OUTPUT_PATH"]
 
-    if path.endswith('/') or os.path.isdir(path):
+    if path.endswith("/") or os.path.isdir(path):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         file_name = f"avito_export_{timestamp}.xlsx"
-        path = os.path.join(path.rstrip('/'), file_name)
+        path = os.path.join(path.rstrip("/"), file_name)
         ext = ".xlsx"
     else:
         ext = os.path.splitext(path)[1].lower()
@@ -101,13 +101,16 @@ def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
         elif ext == ".csv":
             df.to_csv(path, index=False, encoding="utf-8-sig")
         else:
-            path_xlsx = path.rsplit('.', 1)[0] + '.xlsx'
+            path_xlsx = path.rsplit(".", 1)[0] + ".xlsx"
             with excel_writer(path_xlsx) as fname:
                 df.to_excel(fname, index=False)
             path = path_xlsx
 
         file_size = os.path.getsize(path)
-        logger.info(f"Файл сохранен: {os.path.basename(path)} ({file_size / (1024 ** 2):.2f} МБ, {len(df)} строк)")
+        logger.info(
+            f"Файл сохранен: {os.path.basename(path)} "
+            f"({file_size / (1024 ** 2):.2f} МБ, {len(df)} строк)"
+        )
 
     except Exception as e:
         logger.error(f"Ошибка при сохранении файла {path}: {e}")
@@ -195,13 +198,30 @@ def update_avito_autoload_profile(
         logger.error(f"Ошибка при обновлении профиля: {response.status_code}, {response.text}")
     return response
 
-def to_db(df: pd.DataFrame) -> None:
-    """Функция создания реляционной БД из DataFrame"""
 
-    engine = create_engine("postgresql+psycopg2://airflow:airflow@postgres/airflow")
-    df.to_sql(
-        name="avito_table",
-        con=engine,
-        if_exists="replace",
-        index=False
-    )
+def to_db(df: pd.DataFrame, table_name: str = "avito_table") -> None:
+    """Функция записи DataFrame в ClickHouse - все как String"""
+
+    client = clickhouse_connect.get_client(host="clickhouse", port=8123, username="default")
+
+    client.command(f"DROP TABLE IF EXISTS {table_name}")
+
+    df_clean = df.astype(str)
+    df_clean = df_clean.replace(["nan", "<NA>", "None", "NaN"], "")
+
+    columns_sql = ", ".join([f"`{col}` String" for col in df_clean.columns])
+
+    create_table_sql = f"""
+    CREATE TABLE {table_name} (
+        {columns_sql}
+    ) ENGINE = MergeTree()
+    ORDER BY tuple()
+    """
+
+    logger.info(f"Создание таблицы: {table_name}")
+    client.command(create_table_sql)
+
+    csv_data = df_clean.to_csv(index=False, sep="\t", na_rep="")
+    client.command(f"INSERT INTO {table_name} FORMAT TabSeparated", data=csv_data)
+
+    logger.info(f"Данные успешно загружены в таблицу {table_name}: {len(df_clean)} строк")
