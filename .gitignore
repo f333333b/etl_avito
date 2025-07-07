@@ -32,7 +32,7 @@ dist/
 # файлы с данными
 *.parquet
 *.csv
-etl/data/input_sample.xlsx
+!etl/data/input_sample.xlsx
 *.tmp
 *.bak
 *.xls
