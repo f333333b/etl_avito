@@ -18,11 +18,13 @@ services:
     image: apache/airflow:2.8.1
     user: root
     volumes:
-      - airflow-etl-data:/opt/airflow/etl/datalsl
-      - ./etl/data:/opt/airflow/etl/data
+      - ./etl:/opt/airflow/etl
+      - ./dags:/opt/airflow/dags
     command: >
-      bash -c "chmod -R 775 /opt/airflow/etl/data &&
-               chown -R 50000:0 /opt/airflow/etl/data"
+      bash -c "chmod -R 775 /opt/airflow/etl &&
+               chown -R 50000:0 /opt/airflow/etl &&
+               chmod -R 775 /opt/airflow/dags &&
+               chown -R 50000:0 /opt/airflow/dags"
 
   airflow-init:
     build:
@@ -44,12 +46,11 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - airflow-etl-data:/opt/airflow/etl/data
-      - ./etl/data:/opt/airflow/etl/data
+      - ./etl:/opt/airflow/etl
+      - ./dags:/opt/airflow/dags
     command: >
       bash -c "airflow db migrate &&
                airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin"
-
 
   webserver:
     build:
@@ -72,8 +73,8 @@ services:
       - 8080:8080
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - airflow-etl-data:/opt/airflow/etl/data
-      - ./etl/data:/opt/airflow/etl/data
+      - ./etl:/opt/airflow/etl
+      - ./dags:/opt/airflow/dags
     command: airflow webserver
 
   scheduler:
@@ -95,8 +96,8 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - airflow-etl-data:/opt/airflow/etl/data
-      - ./etl/data:/opt/airflow/etl/data
+      - ./etl:/opt/airflow/etl
+      - ./dags:/opt/airflow/dags
     command: airflow scheduler
 
   worker:
@@ -118,11 +119,10 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
       - airflow-logs:/opt/airflow/logs
-      - airflow-etl-data:/opt/airflow/etl/data
-      - ./etl/data:/opt/airflow/etl/data
+      - ./etl:/opt/airflow/etl
+      - ./dags:/opt/airflow/dags
     command: airflow celery worker
 
 volumes:
   postgres-db-volume:
   airflow-logs:
-  airflow-etl-data:

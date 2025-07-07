@@ -37,6 +37,10 @@ def extract() -> None:
                 logger.warning(f"Файл {file_name} пустой, пропускаем")
                 continue
 
+            for col in df.select_dtypes(include=['object']).columns:
+                df[col] = df[col].astype(str)
+            df = df.fillna('')
+
             base_name = os.path.splitext(file_name)[0]
             parquet_name = f"avito_data_{base_name}.parquet"
             output_path = os.path.join(DATA_PATH, parquet_name)
@@ -128,7 +132,8 @@ def load_data() -> None:
                 continue
 
             load(df, config)
-            os.remove(parquet_file)
+            if os.path.exists(parquet_file):
+                os.remove(parquet_file)
             logger.info(f"Загрузка завершена для файла: {parquet_file}")
 
     except Exception as e:

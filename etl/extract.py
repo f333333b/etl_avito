@@ -21,6 +21,7 @@ def extract_files(path: str) -> list[tuple[str, pd.DataFrame]]:
             df = read_input_file(str(file_path), extension)
             file_name = file_path.name
             df["source_file"] = file_name
+            df = clean_for_parquet(df)
             dfs.append((file_name, df))
     return dfs
 
@@ -58,4 +59,13 @@ def read_input_file(file_path: str, extension: str) -> pd.DataFrame:
             logger.error(error_msg)
             raise ValueError(error_msg)
 
+    return df
+
+
+def clean_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
+    """Вспомогательная функция очистки DataFrame для совместимости с Parquet"""
+    df = df.copy()
+    for col in df.select_dtypes(include=['object']).columns:
+        df[col] = df[col].astype(str)
+    df = df.fillna('')
     return df

@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 import pandas as pd
 import requests
 import yadisk
+from sqlalchemy import create_engine
 
 from etl.utils import ensure_dir_created
 
@@ -69,41 +70,26 @@ def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
     """Функция сохранения обработанного файла (Excel или CSV)"""
     df = df.copy()
     path = config["OUTPUT_PATH"]
-    logger.info(f"Исходный путь для сохранения: {path}")
 
     if path.endswith('/') or os.path.isdir(path):
-        if path.endswith('/'):
-            folder = path
-        else:
-            folder = path + '/'
-
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         file_name = f"avito_export_{timestamp}.xlsx"
-        path = os.path.join(folder.rstrip('/'), file_name)
+        path = os.path.join(path.rstrip('/'), file_name)
         ext = ".xlsx"
-        logger.info(f"Путь - это директория, создан файл: {path}")
     else:
         ext = os.path.splitext(path)[1].lower()
-
         if not ext:
             ext = ".xlsx"
             path = f"{path}.xlsx"
-            logger.info(f"Расширение не указано, добавлено .xlsx: {path}")
 
     folder = os.path.dirname(path)
-    logger.info(f"Папка для сохранения: {folder}")
-
     ensure_dir_created(folder)
-    logger.info(f"Папка создана или уже существует: {folder}")
 
     if os.path.exists(path):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         dir_name, file_name = os.path.split(path)
         name, ext = os.path.splitext(file_name)
         path = os.path.join(dir_name, f"{name}_{timestamp}{ext}")
-        logger.info(f"Файл существует, добавлен timestamp: {path}")
-
-    logger.info(f"Финальный путь для сохранения: {path}")
 
     for col in df.select_dtypes(include=["datetimetz"]).columns:
         df[col] = df[col].dt.tz_localize(None)
@@ -115,25 +101,16 @@ def save_dataframe(df: pd.DataFrame, config: Dict) -> str:
         elif ext == ".csv":
             df.to_csv(path, index=False, encoding="utf-8-sig")
         else:
-            logger.warning(f"Неподдерживаемое расширение {ext}, используем .xlsx")
             path_xlsx = path.rsplit('.', 1)[0] + '.xlsx'
             with excel_writer(path_xlsx) as fname:
                 df.to_excel(fname, index=False)
             path = path_xlsx
 
-        logger.info(f"Файл успешно сохранён: {path}")
+        file_size = os.path.getsize(path)
+        logger.info(f"Файл сохранен: {os.path.basename(path)} ({file_size / (1024 ** 2):.2f} МБ, {len(df)} строк)")
 
-        if os.path.exists(path):
-            file_size = os.path.getsize(path)
-            logger.info(f"Размер файла: {file_size / (1024 ** 2):.2f} МБ. Количество строк: {len(df)}")
-        else:
-            logger.error(f"Файл не был создан: {path}")
-
-    except PermissionError as e:
-        logger.error(f"Не удалось записать файл {path}: {e}")
-        raise
     except Exception as e:
-        logger.error(f"Неожиданная ошибка при сохранении файла {path}: {e}")
+        logger.error(f"Ошибка при сохранении файла {path}: {e}")
         raise
 
     return path
